@@ -1,36 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Glovebox
 
-## Getting Started
+Every shop. One service history.
 
-First, run the development server:
+## The problem
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Every repair shop keeps its own records for its own location. The Pep Boys in Ballard knows nothing about the Pep Boys in Queen Anne, let alone the Goodyear down the street or the dealer. Owners are left with emails and paper, which fail at exactly the moments they matter: selling the car, proving a warranty claim, or knowing which technician did what work.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The real cost is concrete. Pay for brake work, lose the receipt, and six months later you pay again for something that was still under warranty.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What it does
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Photograph any service receipt or upload the PDF. Glovebox reads it and builds one timeline per vehicle across every shop:
 
-## Learn More
+- What was done, who did it, and what it cost
+- Odometer reading at every visit, since mileage is the spine of service history
+- Inspection readings like brake linings and tire tread, tracked over time
+- Warranty terms captured from the fine print, with active coverage surfaced like the sticker a shop leaves on your windshield: what is covered, through what date, or what mileage
 
-To learn more about Next.js, take a look at the following resources:
+You confirm what the scan read before anything is saved. Records live on your device.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Status
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+V1 prototype. Extraction is tuned against real Pep Boys invoices and designed to degrade gracefully on other shops' formats. Built with Next.js and Claude.
