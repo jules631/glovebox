@@ -58,14 +58,16 @@ create table if not exists records (
 );
 create index if not exists records_case_idx on records (case_id);
 
--- The chain of custody: every source-backed field -> the span it came from.
+-- The chain of custody: every source-backed field -> the span(s) it came from.
+-- Keyed by span too, so a field cited from two distinct spans keeps both quotes
+-- instead of the second silently overwriting the first.
 create table if not exists mappings (
   record_id     text not null references records (id) on delete cascade,
   field         text not null,
   page          int  not null,
   line          int  not null,
   quote         text not null,
-  primary key (record_id, field)
+  primary key (record_id, field, page, line)
 );
 
 -- INFERRED classifications, kept apart from source-backed facts. Never cited.
@@ -85,7 +87,10 @@ create table if not exists review_questions (
   sources       jsonb not null,
   governing_source text,
   status        text not null default 'open',           -- open | resolved
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  -- One open question per (case, fact): re-running reconciliation refreshes the
+  -- existing row rather than stacking a duplicate, preserving any resolution.
+  unique (case_id, fact)
 );
 create index if not exists review_questions_case_idx on review_questions (case_id);
 
