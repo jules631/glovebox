@@ -6,6 +6,8 @@ Two of these are built. The rest are designed and not built, and the reason in e
 
 ## Built
 
+**The Glovebox address, app side.** Alias tokens, the Postmark webhook (secret gated, records mail before processing, extracts after the response flushes so provider retries never double-process), and the service email card. Live at glovebox-gold.vercel.app; what remains is the mail account itself: a Postmark inbound server pointed at `/api/inbound/postmark?secret=…`, then `POSTMARK_INBOUND_ADDRESS` or `INBOUND_DOMAIN` in the environment so the card shows a real address.
+
 **Photograph or PDF.** The original path. Produces the `photo` or `pdf` trust tier.
 
 **Paste an invoice.** Same extractor, no camera. Dealers and chains already email invoices, so pasting one removes the lighting, the glare, and the counter entirely. This is the honest stand in for full email ingestion, and it is why that is the first thing to build next: the parsing already works, only the delivery is manual.
