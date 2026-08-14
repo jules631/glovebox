@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Glovebox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #faf8f2;
+    color: #1c1917;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 0 12vw;
+  }
+  .slide.on { display: flex; }
+  .kicker {
+    font-size: 13px; font-weight: 700;
+    letter-spacing: .35em; text-transform: uppercase;
+    color: #a8a29e; margin-bottom: 28px;
+  }
+  h1 {
+    font-size: 64px; font-weight: 900;
+    text-transform: uppercase; letter-spacing: .04em;
+    line-height: 1.05; max-width: 20ch;
+  }
+  h1 .accent { color: #4338ca; }
+  h1 .good { color: #15803d; }
+  p.sub {
+    margin-top: 26px; font-size: 22px; line-height: 1.5;
+    color: #57534e; max-width: 44ch;
+  }
+  .brand {
+    font-size: 96px; font-weight: 900; letter-spacing: .06em;
+    text-transform: uppercase; color: #4338ca;
+  }
+  .tag { margin-top: 18px; font-size: 24px; color: #57534e; }
+  .steps { margin-top: 40px; display: flex; flex-direction: column; gap: 22px; text-align: left; }
+  .step { display: flex; align-items: baseline; gap: 18px; font-size: 24px; }
+  .step b {
+    flex: none; width: 44px; height: 44px; border-radius: 10px;
+    background: #4338ca; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; transform: translateY(6px);
+  }
+  .step span small { display: block; font-size: 16px; color: #78716c; margin-top: 2px; }
+  .sticker {
+    margin-top: 34px; border: 3px solid #15803d; border-radius: 14px;
+    overflow: hidden; width: 420px; text-align: left;
+    background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  }
+  .sticker .head {
+    background: #15803d; color: #fff; padding: 8px 16px;
+    font-weight: 800; letter-spacing: .18em; font-size: 13px; text-transform: uppercase;
+  }
+  .sticker .body { padding: 14px 16px; font-size: 15px; color: #44403c; line-height: 1.45; }
+</style>
+</head>
+<body>
+
+<section class="slide" id="s1">
+  <div class="brand">Glovebox</div>
+  <p class="tag">Every shop. One service history.</p>
+</section>
+
+<section class="slide" id="s2">
+  <div class="kicker">The problem</div>
+  <h1>Your car&rsquo;s history is scattered</h1>
+  <p class="sub">Dealer. Chain. Indie. Your own driveway. Every shop keeps its own records &mdash; and none of them can see the others.</p>
+</section>
+
+<section class="slide" id="s3">
+  <div class="kicker">And no, CARFAX doesn&rsquo;t fix it</div>
+  <h1>Indie work, DIY, and prices are <span class="accent">invisible</span></h1>
+  <p class="sub">By its own documentation: records you add never reach the report, and the shop feed carries no prices at all.</p>
+</section>
+
+<section class="slide" id="s4">
+  <div class="kicker">What that costs you</div>
+  <h1>People pay twice for the <span class="accent">same repair</span></h1>
+  <p class="sub">Brake job in November. Same brakes quoted again in June &mdash; still under warranty. No single shop could see it. You just paid for it.</p>
+</section>
+
+<section class="slide" id="s5">
+  <div class="kicker">Glovebox</div>
+  <h1>One record. <span class="good">On your side</span> of the counter.</h1>
+  <p class="sub">Snap, paste, or log any service. AI reads it into one timeline your car keeps for life &mdash; watch.</p>
+</section>
+
+<section class="slide" id="s6">
+  <div class="kicker">Why it matters</div>
+  <h1>Know what&rsquo;s <span class="good">covered</span>. Know what&rsquo;s <span class="accent">due</span>.</h1>
+  <p class="sub">And when you sell: a record the next owner can actually check &mdash; shop, phone number, work order &mdash; not just take your word for.</p>
+</section>
+
+<section class="slide" id="s7">
+  <div class="kicker">Getting started</div>
+  <h1>Start in 60 seconds</h1>
+  <div class="steps">
+    <div class="step"><b>1</b><span>Add your car by VIN<small>Open recalls and factory details appear instantly &mdash; before any receipt.</small></span></div>
+    <div class="step"><b>2</b><span>Snap or paste your last invoice<small>AI reads the line items, the odometer, and the warranty fine print.</small></span></div>
+    <div class="step"><b>3</b><span>Log the work you do yourself<small>DIY is invisible to every other system. Not this one.</small></span></div>
+  </div>
+</section>
+
+<section class="slide" id="s8">
+  <div class="brand" style="font-size:80px">Glovebox</div>
+  <p class="tag">Your car&rsquo;s whole story. In your pocket.</p>
+  <div class="sticker">
+    <div class="head">Still covered</div>
+    <div class="body">Never pay twice for the same repair again. The receipt remembers &mdash; even when the shop counter doesn&rsquo;t.</div>
+  </div>
+</section>
+
+<script>
+  function show() {
+    const id = location.hash ? location.hash.slice(1) : "s1";
+    document.querySelectorAll(".slide").forEach(s => s.classList.toggle("on", s.id === id));
+  }
+  addEventListener("hashchange", show);
+  show();
+</script>
+</body>
+</html>

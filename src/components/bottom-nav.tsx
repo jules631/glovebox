@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Warehouse, ScanLine } from "lucide-react";
+import { Warehouse, ScanLine, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/", label: "Garage", icon: Warehouse },
-  { href: "/capture", label: "Scan receipt", icon: ScanLine },
+  { href: "/capture", label: "Add record", icon: ScanLine },
+  // DIY work reaches no reporting system anywhere, so it needs its own way in
+  // rather than being buried behind the receipt scanner.
+  { href: "/log", label: "Did it myself", icon: Wrench },
 ];
 
 export function BottomNav() {

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:setup": "node scripts/db-setup.mjs"
+    "db:setup": "node scripts/db-setup.mjs",
+    "test": "node --experimental-strip-types --import ./scripts/register-ts.mjs --test scripts/test-*.mjs",
+    "eval": "node --experimental-strip-types --import ./scripts/register-ts.mjs scripts/eval-extraction.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

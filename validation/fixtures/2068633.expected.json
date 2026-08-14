@@ -1,0 +1,24 @@
+{
+  "_note": "Ground truth for Pep Boys work order 2068633, a real invoice. Only fields a human verified off the paper are listed; anything absent is not scored.",
+  "vehicle": { "year": 2016, "make": "Mazda", "model": "3", "vin": "JM1BM1T7XG1284334" },
+  "visit": {
+    "shopName": "Pep Boys",
+    "storeNumber": "6449",
+    "workOrderNumber": "2068633",
+    "dateIn": "2026-07-07",
+    "mileage": 62786,
+    "lineItemCount": 8,
+    "total": 145.44,
+    "tax": 13.88,
+    "technicians": ["Jeffrey K"],
+    "brakeLiningCount": 4,
+    "tireTreadCount": 4,
+    "rearRightTread": 5,
+    "warrantyCount": 2,
+    "warrantyDurations": ["bounded", "bounded"],
+    "warrantyMonths": [6, 3],
+    "warrantyMiles": [6000, 3000],
+    "anyProrated": false,
+    "hasPartNumber": "PL-14459"
+  }
+}

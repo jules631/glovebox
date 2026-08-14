@@ -1,11 +1,12 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import { BackHeader } from "@/components/page-header";
 import { Odometer } from "@/components/odometer";
 import { VisitCard } from "@/components/visit-card";
 import { WarrantySticker } from "@/components/warranty-sticker";
+import { ClaimPacketCard, DueList, MileagePanel, RepeatAlerts, TrustPanel, WearTrends } from "@/components/health-panels";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,170 +16,163 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { getVehicle, getVisits, setVehicleMileage } from "@/lib/store";
-import { warrantyStatuses, type WarrantyStatus } from "@/lib/warranty";
-import { fmtDate, vehicleSubtitle, vehicleTitle } from "@/lib/format";
-import type { ServiceVisit, Vehicle } from "@/lib/types";
+import { getGarage, setVehicleMileage } from "@/lib/store";
+import { buildVehicleReport, type VehicleReport } from "@/lib/vehicle-report";
+import { vehicleSubtitle, vehicleTitle } from "@/lib/format";
 
 export default function VehiclePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-  const [visits, setVisits] = useState<ServiceVisit[]>([]);
-  const [statuses, setStatuses] = useState<WarrantyStatus[]>([]);
+  const [report, setReport] = useState<VehicleReport | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [mileageDraft, setMileageDraft] = useState("");
   const [mileageOpen, setMileageOpen] = useState(false);
   const [showAllCoverage, setShowAllCoverage] = useState(false);
 
-  function reload() {
-    const v = getVehicle(id);
-    const vis = getVisits(id);
-    setVehicle(v ?? null);
-    setVisits(vis);
-    setStatuses(v ? warrantyStatuses(v, vis) : []);
+  const reload = useCallback(async () => {
+    const { vehicles, visits } = await getGarage();
+    const vehicle = vehicles.find((v) => v.id === id);
+    setReport(vehicle ? buildVehicleReport(vehicle, visits.filter((v) => v.vehicleId === id)) : null);
     setLoaded(true);
-  }
+  }, [id]);
 
-  useEffect(reload, [id]);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
-  if (loaded && !vehicle) {
+  if (loaded && !report) {
     return (
       <div>
         <BackHeader href="/" label="Garage" />
-        <p className="px-5 pt-8 text-sm text-muted-foreground">
-          This vehicle isn&apos;t in your garage. Head back and pick one, or scan a receipt to add it.
-        </p>
+        <p className="px-5 pt-6 text-sm text-muted-foreground">That vehicle is not in this garage.</p>
       </div>
     );
   }
 
-  // Soonest-expiring coverage first; the two most urgent get the full sticker
-  // treatment, the rest collapse so history stays above the fold.
-  const active = statuses
-    .filter((s) => s.isActive)
-    .sort((a, b) => (a.expiresDate ?? "9999").localeCompare(b.expiresDate ?? "9999"));
-  const shownStickers = showAllCoverage ? active : active.slice(0, 2);
-  const activeCountByVisit = new Map<string, number>();
-  for (const s of active) {
-    activeCountByVisit.set(s.visit.id, (activeCountByVisit.get(s.visit.id) ?? 0) + 1);
+  if (!report) {
+    return (
+      <div>
+        <BackHeader href="/" label="Garage" />
+        <div className="space-y-3 px-5 pt-4">
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
+  const { vehicle, visits, basis, activeCoverage, coverage, overdue, wear, repeats, trust, completeness, mileage } = report;
+  const shownCoverage = showAllCoverage ? coverage : activeCoverage;
+
+  async function saveMileage() {
+    const parsed = Number(mileageDraft.replace(/[^0-9]/g, ""));
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    await setVehicleMileage(id, parsed);
+    setMileageOpen(false);
+    setMileageDraft("");
+    await reload();
   }
 
   return (
-    <div>
+    <div className="pb-8">
       <BackHeader href="/" label="Garage" />
-      {!vehicle ? (
-        <div className="space-y-3 px-5 pt-3">
-          <Skeleton className="h-20 w-full rounded-lg" />
-          <Skeleton className="h-32 w-full rounded-lg" />
-        </div>
-      ) : (
-        <div className="px-5">
-          <h1 className="font-display text-3xl font-bold uppercase leading-none tracking-wide">
-            {vehicleTitle(vehicle)}
-          </h1>
-          {vehicleSubtitle(vehicle) && (
-            <p className="mt-1 text-sm text-muted-foreground">{vehicleSubtitle(vehicle)}</p>
-          )}
-          <div className="mt-3 flex items-center gap-2">
-            <Odometer miles={vehicle.currentMileage} />
+
+      <div className="space-y-6 px-5 pt-4">
+        <header>
+          <h1 className="font-display text-2xl font-semibold leading-tight">{vehicleTitle(vehicle)}</h1>
+          {vehicleSubtitle(vehicle) && <p className="text-sm text-muted-foreground">{vehicleSubtitle(vehicle)}</p>}
+          {vehicle.vin && <p className="mt-0.5 font-mono text-xs text-muted-foreground">VIN {vehicle.vin}</p>}
+
+          <div className="mt-3 flex items-center gap-3">
+            <Odometer miles={basis.miles} />
+            <Button variant="ghost" size="sm" onClick={() => setMileageOpen(true)}>
+              <Pencil className="size-3.5" />
+              Update
+            </Button>
             <Dialog open={mileageOpen} onOpenChange={setMileageOpen}>
-              <DialogTrigger
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => setMileageDraft(vehicle.currentMileage?.toString() ?? "")}
-              >
-                <Pencil className="size-3" />
-                Update
-              </DialogTrigger>
-              <DialogContent className="max-w-sm">
+              <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Update odometer</DialogTitle>
+                  <DialogTitle>Current odometer</DialogTitle>
                   <DialogDescription>
-                    Warranty checks are based on your last known reading
-                    {vehicle.mileageAsOf ? ` from ${fmtDate(vehicle.mileageAsOf)}` : ""}. Enter what the
-                    dash shows now.
+                    Everything that depends on mileage, coverage limits and service intervals alike, is only as current
+                    as this number.
                   </DialogDescription>
                 </DialogHeader>
                 <Input
                   inputMode="numeric"
-                  value={mileageDraft}
-                  onChange={(e) => setMileageDraft(e.target.value.replace(/[^0-9]/g, ""))}
                   placeholder="62786"
-                  className="font-mono"
+                  value={mileageDraft}
+                  onChange={(e) => setMileageDraft(e.target.value)}
                 />
                 <DialogFooter>
-                  <Button
-                    onClick={() => {
-                      const miles = parseInt(mileageDraft, 10);
-                      if (!Number.isNaN(miles)) {
-                        setVehicleMileage(vehicle.id, miles);
-                        reload();
-                      }
-                      setMileageOpen(false);
-                    }}
-                  >
-                    Save reading
-                  </Button>
+                  <Button onClick={saveMileage}>Save reading</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
-          {vehicle.vin && (
-            <p className="mt-2 font-mono text-[11px] tracking-wide text-muted-foreground">
-              VIN {vehicle.vin}
+          {basis.isProjected && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Estimated from your driving. Last actual reading was {basis.daysStale} days ago.
             </p>
           )}
+        </header>
 
-          {active.length > 0 && (
-            <div className="mt-5 space-y-3">
-              {shownStickers.map((s, i) => (
-                <WarrantySticker key={`${s.visit.id}-${i}`} status={s} />
-              ))}
-              {active.length > 2 && (
+        {/* Money first. Everything below this is context for it. */}
+        <RepeatAlerts repeats={repeats} />
+
+        {shownCoverage.length > 0 && (
+          <section className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Coverage
+              </h2>
+              {coverage.length > activeCoverage.length && (
                 <button
-                  type="button"
+                  className="text-xs text-muted-foreground underline underline-offset-2"
                   onClick={() => setShowAllCoverage((v) => !v)}
-                  className="w-full rounded-lg border border-dashed border-covered/50 py-2 text-xs font-semibold uppercase tracking-wider text-covered transition-colors hover:bg-covered/5"
                 >
-                  {showAllCoverage ? "Show less" : `${active.length - 2} more covered items`}
+                  {showAllCoverage ? "Hide expired" : `Show all ${coverage.length}`}
                 </button>
               )}
-              <MileageBasisNote active={active} />
             </div>
-          )}
+            <div className="space-y-3">
+              {shownCoverage.map((status, i) => (
+                <div key={i} className="space-y-2">
+                  <WarrantySticker status={status} />
+                  {status.state !== "expired" && <ClaimPacketCard packet={status.claim} />}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-          <h2 className="mt-7 font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <DueList items={overdue.length ? overdue : report.schedule.slice(0, 6)} />
+        <WearTrends series={wear} />
+        <MileagePanel analysis={mileage} />
+        <TrustPanel trust={trust} completeness={completeness} />
+
+        <section className="space-y-2">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Service history
           </h2>
-          <div className="mt-2 space-y-3 pb-8">
-            {visits.length === 0 ? (
-              <p className="rounded-lg border-2 border-dashed border-border p-5 text-center text-sm text-muted-foreground">
-                No visits recorded yet. Scan a receipt to start this vehicle&apos;s history.
-              </p>
-            ) : (
-              visits.map((visit) => (
+          {visits.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+              No visits recorded yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {visits.map((visit) => (
                 <VisitCard
                   key={visit.id}
                   visit={visit}
-                  activeWarrantyCount={activeCountByVisit.get(visit.id) ?? 0}
+                  activeWarrantyCount={activeCoverage.filter((c) => c.visit.id === visit.id).length}
                 />
-              ))
-            )}
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
-  );
-}
-
-function MileageBasisNote({ active }: { active: WarrantyStatus[] }) {
-  const basis = active[0]?.mileageBasis;
-  if (basis == null) return null;
-  return (
-    <p className="text-[11px] text-muted-foreground">
-      Mileage checks based on your last recorded odometer: {basis.toLocaleString("en-US")} mi
-    </p>
   );
 }

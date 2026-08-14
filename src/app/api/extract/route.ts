@@ -1,11 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedReceiptSchema } from "@/lib/types";
+import { SYSTEM_PROMPT } from "@/lib/extraction-prompt";
 
-// Opus vision on a multi-page receipt can take 20-40s.
-export const maxDuration = 60;
+// A timeout ceiling, not a budget: an unused second costs nothing. Vision on a
+// multi page invoice runs 20 to 40 seconds before any thinking, so the old 60s
+// left no margin once adaptive thinking was in the picture. Spend is controlled
+// by effort on the request below, not by this number.
+export const maxDuration = 300;
 
 const MAX_FILES = 6;
+const MAX_TEXT_CHARS = 60_000;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 
@@ -24,19 +29,6 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-const SYSTEM_PROMPT = `You are an expert automotive service-record extractor. You read repair shop invoices, work orders, and point-of-sale receipts (Pep Boys, Goodyear, dealers, independent shops) and produce one structured service record.
-
-Rules:
-- Never invent a value. If a field is not present or unreadable, return null (or an empty array).
-- Normalize all dates to ISO format (YYYY-MM-DD).
-- The odometer reading may be labeled "Mileage In/Out", "Odometer", or similar. Use the mileage at time of service.
-- Classify every line item as "part", "labor", "fee" (shop fees, disposal fees, taxes listed as line items), or "other". Attribute the technician who performed it when the document says so.
-- Package line items (e.g. an oil change package) should be broken into their components when the document itemizes them.
-- Parse inspection measurements when present: brake linings, rotor thickness, tire tread depths, per corner (front-left, front-right, rear-left, rear-right). US inspection sheets usually measure in 32nds of an inch.
-- Extract warranty terms: condense the language faithfully into "description", and pull structured months/miles bounds when stated (e.g. "6 months or 6,000 miles" -> months: 6, miles: 6000). Note what each term applies to and whether it covers parts, labor, or both. Include exclusions in the description when they matter (e.g. "excludes brake pads").
-- If multiple images are provided they are pages of the same document or two documents for the same visit (invoice + payment receipt). Produce ONE record and reconcile totals across them.
-- Use extractionNotes to flag judgment calls or ambiguities for the human reviewing (e.g. "line items did not sum to the printed total; kept the printed total").`;
-
 type ImageType = (typeof IMAGE_TYPES)[number];
 
 function isImageType(type: string): type is ImageType {
@@ -52,16 +44,26 @@ export async function POST(request: Request) {
     );
   }
 
-  let files: File[];
+  // Two intake paths through one extractor. Pasted text matters more than it
+  // looks: dealers and chains already email invoices, so pasting one removes
+  // the camera, the lighting, and the standing-at-the-counter problem entirely.
+  // It is also the honest stand in for full email ingestion, which needs an
+  // inbound mail service this prototype does not have.
+  let files: File[] = [];
+  let pastedText = "";
   try {
     const formData = await request.formData();
     files = formData.getAll("files").filter((f): f is File => f instanceof File);
+    pastedText = String(formData.get("text") ?? "").trim();
   } catch {
-    return Response.json({ error: "Expected multipart form data with files." }, { status: 400 });
+    return Response.json({ error: "Expected multipart form data with files or text." }, { status: 400 });
   }
 
-  if (files.length === 0) {
-    return Response.json({ error: "Attach at least one receipt photo or PDF." }, { status: 400 });
+  if (files.length === 0 && !pastedText) {
+    return Response.json({ error: "Paste an invoice, or attach a photo or PDF." }, { status: 400 });
+  }
+  if (pastedText.length > MAX_TEXT_CHARS) {
+    return Response.json({ error: "That text is too long to be one invoice." }, { status: 400 });
   }
   if (files.length > MAX_FILES) {
     return Response.json({ error: `At most ${MAX_FILES} files per scan.` }, { status: 400 });
@@ -84,20 +86,32 @@ export async function POST(request: Request) {
       );
     }
   }
+  if (pastedText) {
+    blocks.push({
+      type: "text",
+      text: `The following is the text of a service invoice, pasted or forwarded by the vehicle owner. It may include email headers and quoting artifacts; ignore those and extract only the service record.\n\n<invoice>\n${pastedText}\n</invoice>`,
+    });
+  }
+
   blocks.push({
     type: "text",
-    text: "Extract the service record from this receipt into the required structure.",
+    text: "Extract the service record into the required structure.",
   });
 
   const client = new Anthropic();
 
   try {
     const response = await client.messages.parse({
-      model: "claude-opus-4-8",
+      model: "claude-opus-5",
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: blocks }],
-      output_config: { format: zodOutputFormat(ExtractedReceiptSchema) },
+      // Thinking is on by default on this model, and effort defaults to high.
+      // Extraction is a careful read of a short document, not a hard reasoning
+      // problem: medium reconciles a multi page invoice without paying for
+      // depth this task never uses. Raise it if the eval shows accuracy loss,
+      // which is the whole reason the eval exists.
+      output_config: { format: zodOutputFormat(ExtractedReceiptSchema), effort: "medium" },
     });
 
     if (!response.parsed_output) {

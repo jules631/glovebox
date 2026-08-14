@@ -6,8 +6,11 @@ import { BackHeader } from "@/components/page-header";
 import { CornerReadout } from "@/components/corner-readout";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getVehicle, getVisit, getVisits } from "@/lib/store";
-import { warrantyStatuses, type WarrantyStatus } from "@/lib/warranty";
+import { getGarage } from "@/lib/store";
+import { buildVehicleReport } from "@/lib/vehicle-report";
+import type { WarrantyStatus } from "@/lib/warranty";
+import { visitTrust, type VisitTrust } from "@/lib/provenance";
+import { ClaimPacketCard } from "@/components/health-panels";
 import { fmtDate, fmtMiles, fmtUSD } from "@/lib/format";
 import type { ServiceVisit } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -18,16 +21,23 @@ export default function VisitPage({ params }: { params: Promise<{ id: string; vi
   const { id, vid } = use(params);
   const [visit, setVisit] = useState<ServiceVisit | null>(null);
   const [statuses, setStatuses] = useState<WarrantyStatus[]>([]);
+  const [trust, setTrust] = useState<VisitTrust | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const v = getVisit(vid);
-    setVisit(v ?? null);
-    const vehicle = getVehicle(id);
-    if (v && vehicle) {
-      setStatuses(warrantyStatuses(vehicle, getVisits(id)).filter((s) => s.visit.id === vid));
+    async function load() {
+      const { vehicles, visits } = await getGarage();
+      const v = visits.find((x) => x.id === vid) ?? null;
+      setVisit(v);
+      const vehicle = vehicles.find((x) => x.id === id);
+      if (v && vehicle) {
+        const report = buildVehicleReport(vehicle, visits.filter((x) => x.vehicleId === id));
+        setStatuses(report.coverage.filter((s) => s.visit.id === vid));
+        setTrust(visitTrust(v));
+      }
+      setLoaded(true);
     }
-    setLoaded(true);
+    void load();
   }, [id, vid]);
 
   if (!loaded) {
@@ -147,7 +157,7 @@ export default function VisitPage({ params }: { params: Promise<{ id: string; vi
           </dl>
         </section>
 
-        {/* Warranties on this visit */}
+        {/* Coverage recorded on this visit */}
         {statuses.length > 0 && (
           <section className="mt-5">
             <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -159,32 +169,71 @@ export default function VisitPage({ params }: { params: Promise<{ id: string; vi
                   key={i}
                   className={cn(
                     "rounded-lg border p-3",
-                    s.isActive ? "border-covered/40 bg-covered/5" : "border-border bg-card",
+                    s.state === "active"
+                      ? "border-covered/40 bg-covered/5"
+                      : s.state === "not_computable"
+                        ? "border-dashed border-border bg-card"
+                        : "border-border bg-card",
                   )}
                 >
                   <div className="flex items-start gap-2">
-                    {s.isActive ? (
-                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-covered" />
-                    ) : (
+                    {s.state === "expired" ? (
                       <ShieldX className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-covered" />
                     )}
-                    <div>
-                      <p className="text-sm font-medium leading-snug">
-                        {s.term.appliesTo ?? s.term.description}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-snug">{s.term.appliesTo ?? s.term.description}</p>
+                      <p className="mt-0.5 text-xs italic leading-snug text-muted-foreground">
+                        &ldquo;{s.term.description}&rdquo;
                       </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{s.term.description}</p>
+                      {/* The explanation, not a verdict. */}
                       <p
                         className={cn(
                           "mt-1 text-xs font-medium",
-                          s.isActive ? "text-covered" : "text-muted-foreground",
+                          s.state === "expired" ? "text-muted-foreground" : "text-covered",
                         )}
                       >
-                        {s.isActive ? "Active" : "Expired"}
-                        {s.expiresDate ? ` · through ${fmtDate(s.expiresDate)}` : ""}
-                        {s.expiresMileage != null ? ` or ${fmtMiles(s.expiresMileage)}` : ""}
+                        {s.explanation}
                       </p>
+                      {s.conditions.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {s.conditions.map((c, ci) => (
+                            <li key={ci} className="text-[11px] leading-snug text-muted-foreground">
+                              · {c}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
+                  {s.state !== "expired" && (
+                    <div className="mt-3">
+                      <ClaimPacketCard packet={s.claim} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Where this record came from. A buyer cannot evaluate a claim, but
+            they can evaluate its provenance, so it is stated on the record
+            itself rather than only in aggregate. */}
+        {trust && (
+          <section className="mt-5 rounded-lg border border-border bg-card p-3.5">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Where this came from
+            </h2>
+            <p className="mt-2 text-sm font-medium">{trust.label}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Recorded {trust.ageDays} days ago{trust.amended ? " · amended since" : ""}
+            </p>
+            <ul className="mt-2 space-y-1">
+              {trust.verifiableBy.map((v, i) => (
+                <li key={i} className="text-xs leading-snug text-muted-foreground">
+                  · {v}
                 </li>
               ))}
             </ul>

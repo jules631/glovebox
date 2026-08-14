@@ -1,0 +1,48 @@
+PEP BOYS #6449
+5601 15TH AVE NW, SEATTLE, WA 98107
+(206) 783-4423
+
+Invoice - Customer Copy - Page 1
+
+Work Order #: 2068633
+Date : 2026-07-07
+Promised: 2026-07-15
+Service Manager: Jonathon Kindle
+Technician: Jeffrey K
+
+Vehicle: 2016 MAZDA 3
+Vin No.: JM1BM1T7XG1284334
+License: WA BMG4770
+Mileage In / Out: 62786 / 62786
+
+SERVICES PERFORMED
+PENNZOIL PLATINUM SYNTHETIC OIL CHANGE          1      39.04     39.04   TECH: JEFFREY K
+0W-20 PLATINUM FULL SYNTHETIC OIL (BULK)        4      13.99     55.96
+OIL FILTER  PN PL-14459                         1       9.99      9.99
+TIRE ROTATION                                   1       9.99      9.99   TECH: JEFFREY K
+RESET MAINTENANCE REQUIRED DISPLAY              1       9.99      9.99   TECH: JEFFREY K
+BRAKE SYSTEM INSPECTION                         1       0.00      0.00   TECH: JEFFREY K
+COMPLIMENTARY VEHICLE INSPECTION                1       0.00      0.00   TECH: JEFFREY K
+SHOP SUPPLY FEE                                 1       6.59      6.59
+
+INSPECTION READINGS
+Brake lining  LF 8/32  RF 8/32  LR 6/32  RR 6/32
+Tire tread    LF 6/32  RF 6/32  LR 6/32  RR 5/32
+Notes: Customer reports squeaking during braking. Battery test requested.
+
+Parts     65.95
+Labor     59.02
+Fees       6.59
+Tax       13.88
+Total :  145.44
+Paid: VISA ************3911
+
+Page 2
+
+LIMITED WARRANTY
+Installed parts replaced free if they fail within 6 months or 6,000 miles,
+whichever comes first. Excludes filters and fluids. Original invoice required.
+Service and parts not covered by other warranties are warranted for 90 days
+or 3,000 miles, whichever comes first.
+
+NEED A TOW? CALL 1-800-PEP-BOYS

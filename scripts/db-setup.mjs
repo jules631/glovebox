@@ -45,7 +45,10 @@ const sql = neon(url);
 
 // The base schema. Split on statement boundaries; every statement is guarded by
 // `if not exists`, so re-running is a no-op on tables that already exist.
-const schema = readFileSync(resolve(root, "src/lib/case/schema.sql"), "utf8");
+const schema = [
+  readFileSync(resolve(root, "src/lib/case/schema.sql"), "utf8"),
+  readFileSync(resolve(root, "src/lib/db/schema.sql"), "utf8"),
+].join("\n\n");
 const statements = schema
   .split("\n")
   .filter((l) => !l.trim().startsWith("--")) // drop full-line comments
