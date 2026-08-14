@@ -98,3 +98,25 @@ create table if not exists odometer_readings (
   recorded_at timestamptz not null default now()
 );
 create index if not exists odometer_vehicle_idx on odometer_readings (vehicle_id, read_on);
+
+-- The Glovebox address. One permanent alias token per garage: the user gives
+-- "u-<token>@<inbound domain>" to any shop as their receipt email, and every
+-- future invoice files itself. A direct shop connection with no shop
+-- integration, which is the entire V2 intake thesis.
+alter table garages add column if not exists alias_token text;
+create unique index if not exists garages_alias_idx on garages (alias_token) where alias_token is not null;
+
+-- Every inbound message is recorded before processing, so mail is never lost
+-- to a failed extraction: a failure stays visible and the text can be pasted
+-- through the manual path instead.
+create table if not exists inbound_messages (
+  id           text primary key,
+  garage_id    text not null references garages (id) on delete cascade,
+  from_email   text,
+  subject      text,
+  status       text not null default 'received',   -- received | processed | failed
+  error        text,
+  visit_id     text,
+  received_at  timestamptz not null default now()
+);
+create index if not exists inbound_garage_idx on inbound_messages (garage_id);

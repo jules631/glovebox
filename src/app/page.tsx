@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronRight, ScanLine, ShieldCheck } from "lucide-react";
 import { AppHeader } from "@/components/page-header";
+import { ServiceEmailCard } from "@/components/service-email-card";
 import { Odometer } from "@/components/odometer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -150,6 +151,8 @@ export default function GaragePage() {
             </Link>
           ))
         )}
+
+        {rows !== null && <ServiceEmailCard />}
 
         {notice && (
           <p className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">{notice}</p>

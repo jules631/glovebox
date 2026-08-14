@@ -146,8 +146,17 @@ export async function saveReceipt(
   receipt: ExtractedReceipt,
   options: SaveOptions,
 ): Promise<{ vehicleId: string; visitId: string }> {
-  const sql = db();
   const gid = await garageId(clientId);
+  return saveReceiptForGarage(gid, receipt, options);
+}
+
+/** The save path itself, shared by the cookie routes and the inbound webhook. */
+export async function saveReceiptForGarage(
+  gid: string,
+  receipt: ExtractedReceipt,
+  options: SaveOptions,
+): Promise<{ vehicleId: string; visitId: string }> {
+  const sql = db();
   // Only the vehicles are needed to match. Loading the full visit history here
   // made every save scale with the size of the record it was appending to.
   const vehicles = ((await sql`
@@ -267,4 +276,59 @@ export async function saveVinDecode(clientId: string, vehicleId: string, decode:
     update vehicles set vin_decode = ${JSON.stringify(decode)}
     where id = ${vehicleId} and garage_id = ${gid}
   `;
+}
+
+// The Glovebox address
+
+const ALIAS_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"; // no 0/o/1/l/i
+
+function newAliasToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (b) => ALIAS_ALPHABET[b % ALIAS_ALPHABET.length]).join("");
+}
+
+/** The garage's permanent intake token, minted on first ask. */
+export async function getOrCreateAliasToken(clientId: string): Promise<string> {
+  const sql = db();
+  const gid = await garageId(clientId);
+  const rows = (await sql`select alias_token from garages where id = ${gid}`) as Row[];
+  const existing = rows[0]?.alias_token as string | null;
+  if (existing) return existing;
+
+  const token = newAliasToken();
+  // A collision across 31^8 tokens is vanishingly rare; the partial unique
+  // index turns the rare one into a retried request rather than a corrupt state.
+  await sql`update garages set alias_token = ${token} where id = ${gid} and alias_token is null`;
+  const settled = (await sql`select alias_token from garages where id = ${gid}`) as Row[];
+  return settled[0].alias_token as string;
+}
+
+export async function garageIdByAliasToken(token: string): Promise<string | null> {
+  const sql = db();
+  const rows = (await sql`select id from garages where alias_token = ${token}`) as Row[];
+  return rows.length ? (rows[0].id as string) : null;
+}
+
+// Inbound mail log: recorded before processing so a failed extraction is a
+// visible state, never lost mail.
+
+export async function recordInbound(
+  gid: string,
+  fromEmail: string | null,
+  subject: string | null,
+): Promise<string> {
+  const sql = db();
+  const id = `inb_${crypto.randomUUID()}`;
+  await sql`insert into inbound_messages (id, garage_id, from_email, subject) values (${id}, ${gid}, ${fromEmail}, ${subject})`;
+  return id;
+}
+
+export async function resolveInbound(id: string, visitId: string): Promise<void> {
+  const sql = db();
+  await sql`update inbound_messages set status = 'processed', visit_id = ${visitId} where id = ${id}`;
+}
+
+export async function failInbound(id: string, error: string): Promise<void> {
+  const sql = db();
+  await sql`update inbound_messages set status = 'failed', error = ${error.slice(0, 500)} where id = ${id}`;
 }
