@@ -18,14 +18,35 @@ Two of these are built. The rest are designed and not built, and the reason in e
 
 Ranked by burden removed per unit of work.
 
-### 1. Email ingestion
+### 1. The Glovebox address: a direct shop connection without an integration
 
-The highest leverage change available. A forwarding alias (`u-<token>@in.glovebox.app`) turns capture into a one time setup and then permanent. Probably covers 40 to 60 percent of visits for anyone who uses a dealer or a chain.
+The V2 centerpiece, and a reframing of what "email ingestion" is. Every point of sale system in the country already asks "email for your receipt?" So each user gets a permanent intake address, and the ask becomes:
 
-- **Needs:** an inbound mail service (Postmark, Resend, SendGrid) posting parsed mail to a webhook, plus a domain and SPF/DKIM.
-- **Shape:** webhook verifies the signature, resolves the alias token to a garage, strips quoting and signatures, and runs the existing extractor over the body and any PDF attachment. Attachments arrive as first class documents, so these land at the `shop_email` or `pdf` tier, the strongest evidence the product accepts.
-- **Watch for:** forwarded mail loses original headers, which weakens the provenance claim. Prefer a filter rule that auto forwards on arrival over manual forwarding, and record which one happened.
-- **Why it is not built:** needs a domain and a mail provider, not code.
+> Next time you're at the counter, give them this as your email: **u-jj42@in.glovebox.app**
+
+The shop types it into their customer profile once. Every future invoice arrives automatically, from every shop the user does this with, forever. That is a direct shop connection with zero shop side integration, zero permission, and zero business development: the shop adopts nothing, it just sends the receipt where the customer asked. Intake stops being a per visit effort and becomes a per relationship setup, which is what kills the capture decay problem: habits fade, a standing connection does not.
+
+- **Needs:** an inbound mail service (Postmark and SendGrid both parse inbound mail to a webhook; Cloudflare Email Routing plus a Worker is the free path if the domain is on Cloudflare), a domain, and the app deployed somewhere the webhook can reach.
+- **Shape:** webhook verifies the provider signature, resolves the alias token to a garage, strips quoting and signatures, runs the existing extractor over the body and any PDF attachment, and saves at the `shop_email` or `pdf` tier, the strongest evidence the product accepts.
+- **Watch for:** mail forwarded by the user loses original headers, which weakens the provenance claim relative to mail the shop sent directly. Record which one happened rather than treating them as the same tier of evidence.
+
+#### Why a shop cooperates, and later connects directly
+
+Not money. The shop as buyer hypothesis was the one claim refuted outright in the competitive research, and shops already pay their management system vendors $300 to $700 a month. The trade is retention and evidence based selling, and the precedent already exists: thousands of shops opt into reporting service data to CARFAX through Tekmetric and ALLDATA for exactly these reasons.
+
+1. **The record sends customers back to their counter.** Every record carries the shop's name, phone, and work order. The claim packet for lifetime brake pads walks the customer back into the shop that sold them, where the pads are free but the labor is not. Coverage is a retention loop for the shop that issued it.
+2. **Evidence approves work.** Shops send digital inspection links because customers approve more work when they can see the measurements. A customer whose own record confirms the wear rate says yes faster and trusts the shop more. Honest shops win in a world where customers can verify, and that selection effect is the pitch.
+3. **Declined work comes back.** The quote a customer turns down today surfaces when it is actually due, pointing at the shop that quoted it.
+4. **Verification calls are leads.** A used car buyer phoning to confirm a work order is a future customer talking to the service desk.
+
+One boundary, stated up front: a shop connection must never turn the record into the shop's marketing channel. Reminders and nudges belong to the owner, or the entire "on your side of the counter" position collapses.
+
+#### Why the customer wants it, in record terms
+
+- **Provenance.** A shop emailed invoice lands at the top trust tier, and trust is the entire resale story: source plus age is what a skeptical buyer can actually reason about.
+- **Completeness without discipline.** Wear rates need two readings and gap analysis needs continuity. The record's value compounds with density, and a standing connection supplies density for free.
+- **Prices.** The one thing CARFAX structurally cannot carry: cost per mile, quote comparison, what was paid last time.
+- **Claims that succeed.** Email invoices carry the work order and part numbers, exactly what the claim packet needs.
 
 ### 2. Digital vehicle inspection links
 
