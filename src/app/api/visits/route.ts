@@ -15,6 +15,9 @@ const BodySchema = z.object({
   receiptThumbnail: z.string().nullable().optional(),
   intakeMethod: z.enum(["shop_email", "pdf", "photo", "owner_entry"]),
   hasSourceDocument: z.boolean().optional(),
+  // Stable across retries of the same save, so a lost response or a double
+  // submit resolves to the same visit instead of a duplicate.
+  idempotencyKey: z.string().min(1).max(200).optional(),
 });
 
 export async function POST(request: Request) {

@@ -40,11 +40,14 @@ export function invalidateGarage(): void {
 
 export function getGarage(): Promise<Garage> {
   if (!cache) {
-    cache = request<Garage>("/api/garage").catch((error) => {
-      // A failed load must not poison every later read.
-      cache = null;
+    const self: Promise<Garage> = request<Garage>("/api/garage").catch((error) => {
+      // A failed load must not poison every later read. Guard on identity so a
+      // late rejection only clears its own entry, never a newer in-flight one
+      // started after an invalidate.
+      if (cache === self) cache = null;
       throw error;
     });
+    cache = self;
   }
   return cache;
 }
@@ -109,7 +112,13 @@ export interface SaveResult {
 
 export async function saveExtractedReceipt(
   receipt: ExtractedReceipt,
-  options: { vehicleId?: string; receiptThumbnail?: string | null; intakeMethod: IntakeMethod; hasSourceDocument?: boolean },
+  options: {
+    vehicleId?: string;
+    receiptThumbnail?: string | null;
+    intakeMethod: IntakeMethod;
+    hasSourceDocument?: boolean;
+    idempotencyKey?: string;
+  },
 ): Promise<SaveResult> {
   const result = await request<SaveResult>("/api/visits", {
     method: "POST",

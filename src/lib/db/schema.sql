@@ -71,6 +71,15 @@ create table if not exists visits (
 create index if not exists visits_vehicle_idx on visits (vehicle_id) where deleted_at is null;
 create index if not exists visits_mileage_idx on visits (vehicle_id, occurred_on);
 
+-- Idempotency for saves. The client sends a stable key per logical save (and
+-- the localStorage migration derives one from each legacy record), so a retry
+-- after a lost response, a double submit, or a re-run migration recognizes the
+-- record it already wrote instead of duplicating it. Keys are unguessable, so a
+-- single global unique index is enough.
+alter table visits add column if not exists idempotency_key text;
+create unique index if not exists visits_idempotency_idx
+  on visits (idempotency_key) where idempotency_key is not null;
+
 -- The append only history. Editing a visit writes the prior payload here first,
 -- so the current row is always the latest version and the chain back to the
 -- original is intact. This is what makes "the seller can add but never delete"

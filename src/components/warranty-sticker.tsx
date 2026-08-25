@@ -77,9 +77,10 @@ export function WarrantySticker({ status }: { status: WarrantyStatus }) {
         </div>
 
         {proration && (
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-            {proration.milesUsed.toLocaleString()} of {proration.basisMiles.toLocaleString()} warranted miles used. The
-            shop prorates against its own current selling price, so treat this as a rough figure, not an offer.
+          <p className="mt-2 text-xs leading-snug text-muted-foreground">
+            {proration.milesUsed.toLocaleString("en-US")} of {proration.basisMiles.toLocaleString("en-US")} warranted
+            miles used. The shop prorates against its own current selling price, so treat this as a rough figure, not an
+            offer.
           </p>
         )}
 

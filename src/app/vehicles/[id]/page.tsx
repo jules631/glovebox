@@ -26,20 +26,40 @@ export default function VehiclePage({ params }: { params: Promise<{ id: string }
   const { id } = use(params);
   const [report, setReport] = useState<VehicleReport | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [mileageDraft, setMileageDraft] = useState("");
   const [mileageOpen, setMileageOpen] = useState(false);
   const [showAllCoverage, setShowAllCoverage] = useState(false);
 
   const reload = useCallback(async () => {
-    const { vehicles, visits } = await getGarage();
-    const vehicle = vehicles.find((v) => v.id === id);
-    setReport(vehicle ? buildVehicleReport(vehicle, visits.filter((v) => v.vehicleId === id)) : null);
-    setLoaded(true);
+    try {
+      const { vehicles, visits } = await getGarage();
+      const vehicle = vehicles.find((v) => v.id === id);
+      setReport(vehicle ? buildVehicleReport(vehicle, visits.filter((v) => v.vehicleId === id)) : null);
+      setLoaded(true);
+    } catch {
+      setLoadError(true);
+      setLoaded(true);
+    }
   }, [id]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  if (loadError) {
+    return (
+      <div>
+        <BackHeader href="/" label="Garage" />
+        <div className="px-5 pt-6">
+          <p role="alert" className="text-sm text-destructive">Could not load this vehicle.</p>
+          <Button variant="outline" className="mt-3" onClick={() => { setLoadError(false); setLoaded(false); void reload(); }}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loaded && !report) {
     return (
@@ -80,7 +100,7 @@ export default function VehiclePage({ params }: { params: Promise<{ id: string }
 
       <div className="space-y-6 px-5 pt-4">
         <header>
-          <h1 className="font-display text-2xl font-semibold leading-tight">{vehicleTitle(vehicle)}</h1>
+          <h1 className="font-display text-2xl font-bold uppercase leading-tight tracking-wide">{vehicleTitle(vehicle)}</h1>
           {vehicleSubtitle(vehicle) && <p className="text-sm text-muted-foreground">{vehicleSubtitle(vehicle)}</p>}
           {vehicle.vin && <p className="mt-0.5 font-mono text-xs text-muted-foreground">VIN {vehicle.vin}</p>}
 
@@ -100,6 +120,7 @@ export default function VehiclePage({ params }: { params: Promise<{ id: string }
                   </DialogDescription>
                 </DialogHeader>
                 <Input
+                  aria-label="Current odometer reading in miles"
                   inputMode="numeric"
                   placeholder="62786"
                   value={mileageDraft}

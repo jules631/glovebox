@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import type { ServiceVisit } from "@/lib/types";
-import { fmtDate, fmtUSD } from "@/lib/format";
+import { fmtDate, fmtMiles, fmtUSD } from "@/lib/format";
 
 function headline(visit: ServiceVisit): string {
   const services = visit.lineItems.filter((li) => li.kind !== "fee" && (li.total ?? 0) >= 0);
@@ -26,7 +26,7 @@ export function VisitCard({ visit, activeWarrantyCount }: { visit: ServiceVisit;
       <div className="mt-2.5 flex items-center gap-3 text-xs text-muted-foreground">
         <span>{fmtDate(visit.dateIn)}</span>
         {visit.mileage != null && (
-          <span className="font-mono tabular-nums">{visit.mileage.toLocaleString("en-US")} mi</span>
+          <span className="font-mono tabular-nums">{fmtMiles(visit.mileage)}</span>
         )}
         {activeWarrantyCount > 0 && (
           <span className="ml-auto inline-flex items-center gap-1 font-medium text-covered">

@@ -23,22 +23,37 @@ export default function VisitPage({ params }: { params: Promise<{ id: string; vi
   const [statuses, setStatuses] = useState<WarrantyStatus[]>([]);
   const [trust, setTrust] = useState<VisitTrust | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const { vehicles, visits } = await getGarage();
-      const v = visits.find((x) => x.id === vid) ?? null;
-      setVisit(v);
-      const vehicle = vehicles.find((x) => x.id === id);
-      if (v && vehicle) {
-        const report = buildVehicleReport(vehicle, visits.filter((x) => x.vehicleId === id));
-        setStatuses(report.coverage.filter((s) => s.visit.id === vid));
-        setTrust(visitTrust(v));
+      try {
+        const { vehicles, visits } = await getGarage();
+        const v = visits.find((x) => x.id === vid) ?? null;
+        setVisit(v);
+        const vehicle = vehicles.find((x) => x.id === id);
+        if (v && vehicle) {
+          const report = buildVehicleReport(vehicle, visits.filter((x) => x.vehicleId === id));
+          setStatuses(report.coverage.filter((s) => s.visit.id === vid));
+          setTrust(visitTrust(v));
+        }
+        setLoaded(true);
+      } catch {
+        setLoadError(true);
+        setLoaded(true);
       }
-      setLoaded(true);
     }
     void load();
   }, [id, vid]);
+
+  if (loadError) {
+    return (
+      <div>
+        <BackHeader href={`/vehicles/${id}`} label="History" />
+        <p role="alert" className="px-5 pt-8 text-sm text-destructive">Could not load this record. Pull to refresh, or try again.</p>
+      </div>
+    );
+  }
 
   if (!loaded) {
     return (

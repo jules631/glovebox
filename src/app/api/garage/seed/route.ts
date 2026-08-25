@@ -20,8 +20,12 @@ export async function POST() {
       return Response.json({ error: "This garage already has vehicles in it." }, { status: 409 });
     }
 
-    for (const receipt of seedReceipts()) {
-      await saveDemoReceipt(clientId, receipt);
+    // A stable key per (garage, seed record) makes seeding idempotent: two tabs
+    // racing the empty-garage check, or a double press, reseed the same rows
+    // rather than doubling the demo.
+    const receipts = seedReceipts();
+    for (let i = 0; i < receipts.length; i++) {
+      await saveDemoReceipt(clientId, receipts[i], `seed:${clientId}:${i}`);
     }
 
     return Response.json(await loadGarage(clientId));
