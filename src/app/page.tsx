@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronRight, ScanLine, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronRight, ShieldCheck } from "lucide-react";
 import { AppHeader } from "@/components/page-header";
 import { ServiceEmailCard } from "@/components/service-email-card";
+import { Welcome } from "@/components/welcome";
 import { Odometer } from "@/components/odometer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { getGarage, invalidateGarage, loadDemoGarage } from "@/lib/store";
 import { migrateLocalRecords } from "@/lib/migrate-local";
 import { buildVehicleReport } from "@/lib/vehicle-report";
@@ -24,7 +23,6 @@ interface GarageRow {
 }
 
 export default function GaragePage() {
-  const router = useRouter();
   const [rows, setRows] = useState<GarageRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
@@ -90,28 +88,11 @@ export default function GaragePage() {
             <Skeleton className="h-28 w-full rounded-lg" />
           </>
         ) : rows.length === 0 ? (
-          /* The real empty state.
-             An earlier version wrote fixture cars into storage for anyone who
-             arrived with nothing, so a first-time user saw someone else's Mazda
-             instead of their own empty garage. That hid the hardest problem in
-             this product rather than solving it. */
-          <div className="rounded-lg border border-dashed border-border p-6 text-center">
-            <ScanLine className="mx-auto size-8 text-muted-foreground" />
-            <p className="mt-3 font-display text-lg font-semibold">No vehicles yet</p>
-            <p className="mx-auto mt-1.5 max-w-sm text-sm leading-snug text-muted-foreground">
-              Add a car by its VIN to see its open recalls and factory details before you have captured a single receipt,
-              or start from a service invoice you already have.
-            </p>
-            <div className="mt-4 flex flex-col gap-2">
-              <Button onClick={() => router.push("/add")}>Add a vehicle by VIN</Button>
-              <Button variant="outline" onClick={() => router.push("/capture")}>
-                Add a service record
-              </Button>
-              <Button variant="ghost" size="sm" onClick={onLoadDemo} disabled={loadingDemo}>
-                {loadingDemo ? "Loading…" : "Or load the demo garage"}
-              </Button>
-            </div>
-          </div>
+          /* The garage is still real: nothing is seeded, and the demo stays
+             opt-in and labeled. But an empty first screen was wasting the one
+             moment the product gets to say what it is worth, so the pitch
+             lives here until a vehicle exists. */
+          <Welcome onLoadDemo={onLoadDemo} loadingDemo={loadingDemo} />
         ) : (
           rows.map(({ vehicle, activeCount, repeatCount, overdueCount, mileage }) => (
             <Link
