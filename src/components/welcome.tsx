@@ -50,9 +50,9 @@ export function Welcome({ onLoadDemo, loadingDemo }: { onLoadDemo: () => void; l
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-3xl font-bold leading-tight">
+        <h2 className="font-display text-3xl font-bold leading-tight">
           Proof your car was cared for.
-        </h1>
+        </h2>
         <p className="mt-2 text-sm leading-snug text-muted-foreground">
           Every shop keeps its own records. Glovebox gathers them into one service history that stays
           with the car, shows what is still covered, and gives the next buyer a way to check every claim.

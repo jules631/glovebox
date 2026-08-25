@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
-export function AppHeader() {
+// On the garage screen the wordmark is the page's title, so it is the h1. On
+// screens that carry their own h1 (capture), the banner stays a plain element
+// to avoid a second competing top-level heading.
+export function AppHeader({ asHeading = false }: { asHeading?: boolean }) {
+  const Wordmark = asHeading ? "h1" : "p";
   return (
     <header className="px-5 pb-2 pt-6">
-      <p className="font-display text-3xl font-bold uppercase tracking-[0.08em] text-foreground">
+      <Wordmark className="font-display text-3xl font-bold uppercase tracking-[0.08em] text-foreground">
         Glovebox
-      </p>
+      </Wordmark>
       <p className="text-sm text-muted-foreground">
         Every shop. One service history.
       </p>

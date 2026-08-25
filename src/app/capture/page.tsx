@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, FileText, ScanLine, X } from "lucide-react";
 import { toast } from "sonner";
@@ -46,6 +46,9 @@ export default function CapturePage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehicleChoice, setVehicleChoice] = useState<string>("new");
   const [saving, setSaving] = useState(false);
+  // One key per extracted record, reused across save retries so a lost response
+  // or a second tap resolves to the same visit rather than a duplicate.
+  const [saveKey, setSaveKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (step !== "processing") return;
@@ -64,6 +67,7 @@ export default function CapturePage() {
   }
 
   async function scan() {
+    if (step === "processing") return;
     if (files.length === 0 && !pastedText.trim()) return;
     setStep("processing");
     setError(null);
@@ -90,6 +94,7 @@ export default function CapturePage() {
       const match = await matchVehicle(extracted.vehicle);
       setVehicleChoice(match?.id ?? "new");
       setReceipt(extracted);
+      setSaveKey(crypto.randomUUID());
       setStep("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong reading that receipt.");
@@ -98,12 +103,13 @@ export default function CapturePage() {
   }
 
   async function save() {
-    if (!receipt) return;
+    if (!receipt || saving) return;
     setSaving(true);
+    setError(null);
     try {
-      // How the record arrived decides its trust tier, so it is recorded at the
-      // moment of capture rather than guessed at later. A shop's own PDF is
-      // stronger evidence than a photograph of paper, and the record says so.
+      // How the record arrived decides its trust tier. The server has the final
+      // say (a cookie save can only ever be a photograph or an owner entry); the
+      // hint here just carries whether a document was attached.
       const hasPdf = files.some((f) => f.type === "application/pdf");
       const intakeMethod = pastedText.trim() && files.length === 0 ? "shop_email" : hasPdf ? "pdf" : "photo";
 
@@ -112,6 +118,7 @@ export default function CapturePage() {
         receiptThumbnail: thumbnail,
         intakeMethod,
         hasSourceDocument: files.length > 0,
+        idempotencyKey: saveKey ?? undefined,
       });
       toast.success("Service record saved");
       router.push(`/vehicles/${vehicleId}/visits/${visitId}`);
@@ -146,6 +153,7 @@ export default function CapturePage() {
             setVehicleChoice={setVehicleChoice}
             onSave={save}
             saving={saving}
+            error={error}
           />
         )}
         <input
@@ -219,7 +227,7 @@ function PickStep({
                 type="button"
                 onClick={() => onRemove(i)}
                 aria-label={`Remove ${f.name}`}
-                className="text-muted-foreground hover:text-foreground"
+                className="-m-2 p-2 text-muted-foreground hover:text-foreground"
               >
                 <X className="size-4" />
               </button>
@@ -275,9 +283,11 @@ function ProcessingStep({ stage }: { stage: string }) {
     <div className="flex flex-col items-center pt-16 text-center">
       <div className="relative flex size-24 items-center justify-center overflow-hidden rounded-lg border-2 border-primary/30">
         <FileText className="size-10 text-muted-foreground" strokeWidth={1.4} />
-        <div className="absolute inset-x-0 h-0.5 animate-scan bg-primary" />
+        <div className="absolute inset-x-0 h-0.5 animate-scan bg-primary motion-reduce:hidden" />
       </div>
-      <p className="mt-6 font-display text-lg font-semibold uppercase tracking-wide">{stage}</p>
+      <p role="status" aria-live="polite" className="mt-6 font-display text-lg font-semibold uppercase tracking-wide">
+        {stage}
+      </p>
       <p className="mt-1 text-sm text-muted-foreground">
         A detailed invoice takes 20 to 40 seconds to read.
       </p>
@@ -291,17 +301,24 @@ function Field({
   onChange,
   inputMode,
   placeholder,
+  type,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   inputMode?: "numeric" | "decimal";
   placeholder?: string;
+  type?: "text" | "date";
 }) {
+  const id = useId();
   return (
     <div>
-      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </Label>
       <Input
+        id={id}
+        type={type}
         className="mt-1"
         value={value}
         inputMode={inputMode}
@@ -325,6 +342,7 @@ function ReviewStep({
   setVehicleChoice,
   onSave,
   saving,
+  error,
 }: {
   receipt: ExtractedReceipt;
   setReceipt: (r: ExtractedReceipt) => void;
@@ -333,6 +351,7 @@ function ReviewStep({
   setVehicleChoice: (v: string) => void;
   onSave: () => void;
   saving: boolean;
+  error: string | null;
 }) {
   const { vehicle, visit } = receipt;
 
@@ -373,7 +392,7 @@ function ReviewStep({
             Add this visit to
           </Label>
           <Select value={vehicleChoice} onValueChange={(v) => setVehicleChoice(v ?? "new")}>
-            <SelectTrigger className="mt-1 w-full">
+            <SelectTrigger aria-label="Add this visit to" className="mt-1 w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -420,8 +439,8 @@ function ReviewStep({
           />
           <Field
             label="Date"
+            type="date"
             value={visit.dateIn ?? ""}
-            placeholder="YYYY-MM-DD"
             onChange={(v) => setVisit({ dateIn: v || null })}
           />
           <Field
@@ -453,11 +472,13 @@ function ReviewStep({
           {visit.lineItems.map((li, i) => (
             <li key={i} className="flex items-center gap-2 py-2">
               <Input
+                aria-label={`Line item ${i + 1} description`}
                 className="h-8 flex-1 border-0 px-1 shadow-none focus-visible:ring-1"
                 value={li.description}
                 onChange={(e) => setLineItem(i, { description: e.target.value })}
               />
               <Input
+                aria-label={`Line item ${i + 1} amount`}
                 className="h-8 w-20 border-0 px-1 text-right font-mono text-sm shadow-none focus-visible:ring-1"
                 value={li.total?.toString() ?? ""}
                 inputMode="decimal"
@@ -470,6 +491,7 @@ function ReviewStep({
         <div className="mt-2 flex justify-between border-t border-border pt-2 text-sm font-semibold">
           <span>Total</span>
           <Input
+            aria-label="Invoice total"
             className="h-8 w-24 border-0 px-1 text-right font-mono text-sm font-semibold shadow-none focus-visible:ring-1"
             value={visit.totals.total?.toString() ?? ""}
             inputMode="decimal"
@@ -501,10 +523,10 @@ function ReviewStep({
                 <p className="mt-0.5 text-xs italic text-muted-foreground">&ldquo;{w.description}&rdquo;</p>
 
                 <div className="mt-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <p id={`dur-${i}`} className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     How long does it run
                   </p>
-                  <div className="mt-1.5 flex gap-1.5">
+                  <div role="group" aria-labelledby={`dur-${i}`} className="mt-1.5 flex gap-1.5">
                     {(
                       [
                         ["bounded", "Months or miles"],
@@ -515,6 +537,7 @@ function ReviewStep({
                       <button
                         key={value}
                         type="button"
+                        aria-pressed={w.duration === value}
                         onClick={() =>
                           setWarranty(i, {
                             duration: value,
@@ -557,6 +580,7 @@ function ReviewStep({
                 <div className="mt-3">
                   <button
                     type="button"
+                    aria-pressed={w.prorated}
                     onClick={() =>
                       setWarranty(i, {
                         prorated: !w.prorated,
@@ -590,7 +614,7 @@ function ReviewStep({
                 {/* Read only. A wrong mapping here misnames the items on a claim
                     packet but changes no coverage math, so it is shown to be
                     checked rather than given an index picker nobody would use. */}
-                <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+                <p className="mt-3 text-xs leading-snug text-muted-foreground">
                   <span className="font-medium uppercase tracking-wider">Covers: </span>
                   {w.coversLineItems.length
                     ? w.coversLineItems
@@ -601,13 +625,14 @@ function ReviewStep({
                 </p>
 
                 <div className="mt-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Conditions attached
                   </p>
                   <ul className="mt-1.5 space-y-1.5">
                     {w.conditions.map((c, ci) => (
                       <li key={ci} className="flex items-center gap-1.5">
                         <Input
+                          aria-label={`Condition ${ci + 1}`}
                           className="h-8 flex-1 text-xs"
                           value={c}
                           onChange={(e) =>
@@ -618,11 +643,11 @@ function ReviewStep({
                         />
                         <button
                           type="button"
-                          aria-label="Remove condition"
+                          aria-label={`Remove condition ${ci + 1}`}
                           onClick={() =>
                             setWarranty(i, { conditions: w.conditions.filter((_, xi) => xi !== ci) })
                           }
-                          className="text-muted-foreground hover:text-foreground"
+                          className="-m-2 p-2 text-muted-foreground hover:text-foreground"
                         >
                           <X className="size-4" />
                         </button>
@@ -641,6 +666,12 @@ function ReviewStep({
             ))}
           </ul>
         </section>
+      )}
+
+      {error && (
+        <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          {error}
+        </div>
       )}
 
       <Button className="mt-5 w-full" size="lg" onClick={onSave} disabled={saving}>

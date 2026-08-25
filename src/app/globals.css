@@ -152,3 +152,17 @@
     @apply font-sans;
   }
 }
+
+/* Respect a reduced-motion preference: the scan sweep, skeleton pulse, and
+   spinners are decorative, so neutralize animation and transition motion rather
+   than loop it at people who asked the OS to stop. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -80,7 +80,7 @@ export default function GaragePage() {
 
   return (
     <div>
-      <AppHeader />
+      <AppHeader asHeading />
       <div className="space-y-3 px-5 pt-4">
         {rows === null ? (
           <>

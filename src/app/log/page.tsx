@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { BackHeader } from "@/components/page-header";
@@ -55,19 +55,26 @@ export default function LogDiyPage() {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const saveKey = useRef<string | null>(null);
 
   useEffect(() => {
-    void getVehicles().then((v) => {
-      setVehicles(v);
-      if (v.length) setVehicleId(v[0].id);
-    });
+    getVehicles()
+      .then((v) => {
+        setVehicles(v);
+        if (v.length) setVehicleId(v[0].id);
+      })
+      .catch(() => setLoadError(true));
   }, []);
 
   async function save() {
     const vehicle = vehicles?.find((v) => v.id === vehicleId);
-    if (!vehicle) return;
+    if (!vehicle || saving) return;
     setSaving(true);
     setError(null);
+    // Reused if a save fails and the person tries again, so a lost response
+    // cannot log the same work twice.
+    if (!saveKey.current) saveKey.current = crypto.randomUUID();
     try {
       const odometer = Number(mileage.replace(/[^0-9]/g, ""));
       const amount = Number(cost.replace(/[^0-9.]/g, ""));
@@ -116,7 +123,7 @@ export default function LogDiyPage() {
           },
           extractionNotes: notes.trim() ? [notes.trim()] : [],
         },
-        { vehicleId, intakeMethod: "owner_entry" },
+        { vehicleId, intakeMethod: "owner_entry", idempotencyKey: saveKey.current ?? undefined },
       );
 
       toast.success("Logged");
@@ -125,6 +132,20 @@ export default function LogDiyPage() {
       setError(e instanceof Error ? e.message : "Could not save that.");
       setSaving(false);
     }
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <BackHeader href="/" label="Garage" />
+        <div className="px-5 pt-6">
+          <p role="alert" className="text-sm text-destructive">Could not load your garage.</p>
+          <Button variant="outline" className="mt-3" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (vehicles && vehicles.length === 0) {
@@ -148,9 +169,9 @@ export default function LogDiyPage() {
         <div className="mt-5 space-y-4">
           {vehicles && vehicles.length > 1 && (
             <div className="space-y-2">
-              <Label>Vehicle</Label>
+              <Label htmlFor="log-vehicle">Vehicle</Label>
               <Select value={vehicleId} onValueChange={(v) => setVehicleId(v ?? "")}>
-                <SelectTrigger>
+                <SelectTrigger id="log-vehicle" aria-label="Vehicle">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,9 +186,9 @@ export default function LogDiyPage() {
           )}
 
           <div className="space-y-2">
-            <Label>What did you do</Label>
+            <Label htmlFor="log-service">What did you do?</Label>
             <Select value={service} onValueChange={(v) => v && setService(v as ServiceKey)}>
-              <SelectTrigger>
+              <SelectTrigger id="log-service" aria-label="What did you do">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

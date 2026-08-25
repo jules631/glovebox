@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
+    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur">
       <div className="mx-auto flex max-w-md items-stretch">
         {items.map(({ href, label, icon: Icon }) => {
           const active =
@@ -26,9 +26,14 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 text-xs font-medium transition-colors",
-                active ? "text-primary" : "text-muted-foreground",
+                // The active tab carries a top rule and weight, not only color,
+                // so it does not rely on color alone to read as selected.
+                "relative flex flex-1 flex-col items-center gap-1 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 text-xs transition-colors",
+                active
+                  ? "font-semibold text-primary before:absolute before:inset-x-6 before:top-0 before:h-0.5 before:rounded-full before:bg-primary"
+                  : "font-medium text-muted-foreground",
               )}
             >
               <Icon className="size-5" strokeWidth={active ? 2.4 : 2} />

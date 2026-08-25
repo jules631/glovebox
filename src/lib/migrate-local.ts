@@ -141,6 +141,10 @@ export async function migrateLocalRecords(): Promise<MigrationResult | null> {
         // that a person put it there.
         intakeMethod: "owner_entry",
         receiptThumbnail: receiptThumbnail ?? null,
+        // Stable per legacy record, so a retry after a partial failure, or a
+        // second tab running this at the same time, recognizes what it already
+        // moved instead of writing it twice.
+        idempotencyKey: `migrate:${visit.id}`,
       });
       result.migrated++;
     } catch {
@@ -148,8 +152,8 @@ export async function migrateLocalRecords(): Promise<MigrationResult | null> {
     }
   }
 
-  // Only retire the old key once nothing failed, so a partial migration can be
-  // retried rather than half lost.
+  // Retire the old key once nothing failed. A retry is now safe either way: the
+  // idempotency key means already-moved records are recognized, not duplicated.
   if (result.failed === 0) {
     window.localStorage.setItem(ARCHIVED_KEY, raw);
     window.localStorage.removeItem(OLD_KEY);

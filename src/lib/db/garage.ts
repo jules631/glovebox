@@ -139,6 +139,8 @@ export interface SaveOptions {
   receiptThumbnail?: string | null;
   intakeMethod: IntakeMethod;
   hasSourceDocument?: boolean;
+  /** Stable per logical save; makes a retried or replayed save a no-op. */
+  idempotencyKey?: string;
 }
 
 /**
@@ -162,6 +164,7 @@ export async function saveReceipt(
     receiptThumbnail: options.receiptThumbnail,
     intakeMethod,
     hasSourceDocument: false,
+    idempotencyKey: options.idempotencyKey,
   });
 }
 
@@ -173,9 +176,10 @@ export async function saveReceipt(
 export async function saveDemoReceipt(
   clientId: string,
   receipt: ExtractedReceipt,
+  idempotencyKey: string,
 ): Promise<{ vehicleId: string; visitId: string }> {
   const gid = await garageId(clientId);
-  return saveReceiptForGarage(gid, receipt, { intakeMethod: "seed", hasSourceDocument: false });
+  return saveReceiptForGarage(gid, receipt, { intakeMethod: "seed", hasSourceDocument: false, idempotencyKey });
 }
 
 /** The save path itself, shared by the cookie routes and the inbound webhook. */
@@ -185,13 +189,33 @@ export async function saveReceiptForGarage(
   options: SaveOptions,
 ): Promise<{ vehicleId: string; visitId: string }> {
   const sql = db();
+
+  // Idempotency fast path: if this exact save already committed, return it and
+  // touch nothing else. A lost response, a double submit, or a re-run migration
+  // must not create a second vehicle or a second visit.
+  if (options.idempotencyKey) {
+    const prior = (await sql`
+      select v.id as visit_id, v.vehicle_id
+      from visits v join vehicles ve on ve.id = v.vehicle_id
+      where ve.garage_id = ${gid} and v.idempotency_key = ${options.idempotencyKey}
+      limit 1
+    `) as Row[];
+    if (prior.length) {
+      return { vehicleId: prior[0].vehicle_id as string, visitId: prior[0].visit_id as string };
+    }
+  }
+
   // Only the vehicles are needed to match. Loading the full visit history here
   // made every save scale with the size of the record it was appending to.
   const vehicles = ((await sql`
     select * from vehicles where garage_id = ${gid} order by created_at asc
   `) as Row[]).map(toVehicle);
 
+  // The vehicle write, if any, is built here but run together with the visit
+  // insert in one transaction below, so a failure between them can never leave a
+  // vehicle with no visit behind it.
   let vehicleId = options.vehicleId;
+  let vehicleWrite: ReturnType<typeof sql> | null = null;
   if (vehicleId) {
     const vehicle = vehicles.find((v) => v.id === vehicleId);
     if (!vehicle) {
@@ -206,7 +230,7 @@ export async function saveReceiptForGarage(
     // update cannot be reverted, and the number only ever moves forward.
     const newMileage = receipt.visit.mileage;
     const newAsOf = receipt.visit.dateOut ?? receipt.visit.dateIn;
-    await sql`
+    vehicleWrite = sql`
       update vehicles set
         vin = coalesce(vin, ${receipt.vehicle.vin}),
         license_plate = coalesce(license_plate, ${receipt.vehicle.licensePlate}),
@@ -225,7 +249,7 @@ export async function saveReceiptForGarage(
       vehicleId = matched.id;
     } else {
       vehicleId = `veh_${crypto.randomUUID()}`;
-      await sql`
+      vehicleWrite = sql`
         insert into vehicles (id, garage_id, vin, year, make, model, license_plate, current_mileage, mileage_as_of)
         values (${vehicleId}, ${gid}, ${receipt.vehicle.vin}, ${receipt.vehicle.year}, ${receipt.vehicle.make},
                 ${receipt.vehicle.model}, ${receipt.vehicle.licensePlate}, ${receipt.visit.mileage},
@@ -235,12 +259,31 @@ export async function saveReceiptForGarage(
   }
 
   const visitId = `vis_${crypto.randomUUID()}`;
-  await sql`
-    insert into visits (id, vehicle_id, payload, intake_method, has_source_document, thumbnail, occurred_on, mileage)
+  const visitInsert = sql`
+    insert into visits (id, vehicle_id, payload, intake_method, has_source_document, thumbnail, occurred_on, mileage, idempotency_key)
     values (${visitId}, ${vehicleId}, ${JSON.stringify(receipt.visit)}, ${options.intakeMethod},
             ${options.hasSourceDocument ?? false}, ${options.receiptThumbnail ?? null},
-            ${receipt.visit.dateOut ?? receipt.visit.dateIn}, ${receipt.visit.mileage})
+            ${receipt.visit.dateOut ?? receipt.visit.dateIn}, ${receipt.visit.mileage}, ${options.idempotencyKey ?? null})
+    on conflict (idempotency_key) where idempotency_key is not null do nothing
+    returning id
   `;
+
+  const results = await sql.transaction(vehicleWrite ? [vehicleWrite, visitInsert] : [visitInsert]);
+  const inserted = results[results.length - 1] as Row[];
+
+  if (!inserted.length && options.idempotencyKey) {
+    // A concurrent identical save won the idempotency-key race between the
+    // pre-check and here. Return the visit it committed rather than a phantom id.
+    const existing = (await sql`
+      select v.id as visit_id, v.vehicle_id from visits v
+      join vehicles ve on ve.id = v.vehicle_id
+      where ve.garage_id = ${gid} and v.idempotency_key = ${options.idempotencyKey}
+      limit 1
+    `) as Row[];
+    if (existing.length) {
+      return { vehicleId: existing[0].vehicle_id as string, visitId: existing[0].visit_id as string };
+    }
+  }
 
   return { vehicleId: vehicleId!, visitId };
 }
@@ -264,16 +307,21 @@ export async function amendVisit(
   `) as Row[];
   if (!rows.length) throw new Error("Visit not found in this garage.");
 
-  await sql`
-    insert into visit_amendments (visit_id, prior_payload, reason)
-    values (${visitId}, ${JSON.stringify(rows[0].payload)}, ${reason})
-  `;
-  await sql`
-    update visits set payload = ${JSON.stringify(payload)},
-                      occurred_on = ${payload.dateOut ?? payload.dateIn},
-                      mileage = ${payload.mileage}
-    where id = ${visitId}
-  `;
+  // Both writes commit together or not at all. If the amendment logged but the
+  // update failed (or the reverse), amendment_count and amended_at would report
+  // an edit that never happened, and that count is itself a trust signal.
+  await sql.transaction([
+    sql`
+      insert into visit_amendments (visit_id, prior_payload, reason)
+      values (${visitId}, ${JSON.stringify(rows[0].payload)}, ${reason})
+    `,
+    sql`
+      update visits set payload = ${JSON.stringify(payload)},
+                        occurred_on = ${payload.dateOut ?? payload.dateIn},
+                        mileage = ${payload.mileage}
+      where id = ${visitId}
+    `,
+  ]);
 }
 
 /** Soft delete. A removed record still leaves a trace that it existed. */
@@ -291,16 +339,18 @@ export async function setMileage(clientId: string, vehicleId: string, mileage: n
   const sql = db();
   const gid = await garageId(clientId);
   const today = new Date().toISOString().slice(0, 10);
-  await sql`
-    update vehicles set current_mileage = ${mileage}, mileage_as_of = ${today}
-    where id = ${vehicleId} and garage_id = ${gid}
-  `;
-  // Kept as its own reading too, so the mileage curve gains an independent
-  // point rather than just moving a single mutable number.
-  await sql`
-    insert into odometer_readings (vehicle_id, value, read_on, source, origin)
-    values (${vehicleId}, ${mileage}, ${today}, 'owner', 'Owner entered')
-  `;
+  // The mutable number and its independent curve point move together, so the
+  // curve can never diverge from current_mileage if one write fails.
+  await sql.transaction([
+    sql`
+      update vehicles set current_mileage = ${mileage}, mileage_as_of = ${today}
+      where id = ${vehicleId} and garage_id = ${gid}
+    `,
+    sql`
+      insert into odometer_readings (vehicle_id, value, read_on, source, origin)
+      values (${vehicleId}, ${mileage}, ${today}, 'owner', 'Owner entered')
+    `,
+  ]);
 }
 
 export async function setNickname(clientId: string, vehicleId: string, nickname: string | null): Promise<void> {
