@@ -191,7 +191,7 @@ function PickStep({
       </p>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+        <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
         </div>
       )}

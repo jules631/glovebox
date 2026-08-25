@@ -86,8 +86,11 @@
   --ring: #2547a8;
   --covered: #20784c;
   --covered-foreground: #fdfcf8;
-  --caution: #dd9a0a;
-  --caution-foreground: #181a1f;
+  /* Darkened from #dd9a0a so it clears 4.5:1 as text (it is used for the
+     "Monitor" readout word, not only as a fill). The caution dot uses the same
+     token and still reads. */
+  --caution: #8a5a00;
+  --caution-foreground: #fdfcf8;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

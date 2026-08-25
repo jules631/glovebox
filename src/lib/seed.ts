@@ -30,8 +30,8 @@ export const seedVehicles: Vehicle[] = [
     year: 2016,
     make: "Mazda",
     model: "3",
-    vin: "JM1BM1T7XG1284334",
-    licensePlate: "WA BMG4770",
+    vin: "JM1BM1T7XG1000007",
+    licensePlate: "WA DEMO123",
     nickname: null,
     currentMileage: 62786,
     mileageAsOf: "2026-07-15",
@@ -42,7 +42,7 @@ export const seedVehicles: Vehicle[] = [
     make: "Subaru",
     model: "Outback",
     vin: null,
-    licensePlate: "WA CKR2215",
+    licensePlate: "WA DEMO456",
     nickname: "Nat's Outback",
     currentMileage: 48102,
     mileageAsOf: "2026-03-21",
@@ -77,7 +77,7 @@ export const seedVisits: ServiceVisit[] = [
       { description: "Complimentary vehicle inspection", kind: "labor", quantity: 1, unitPrice: 0, total: 0, performedBy: "Jeffrey K", partNumber: null },
       { description: "Shop fee", kind: "fee", quantity: 1, unitPrice: 6.59, total: 6.59, performedBy: null, partNumber: null },
     ],
-    totals: { parts: 65.95, labor: 59.02, fees: 6.59, tax: 13.88, total: 145.44, paymentMethod: "Visa •••• 3911" },
+    totals: { parts: 65.95, labor: 59.02, fees: 6.59, tax: 13.88, total: 145.44, paymentMethod: "Visa •••• 4242" },
     diagnostics: {
       brakeLinings: [
         { position: "front-left", value: 8, unit: "32nds" },
@@ -145,7 +145,7 @@ export const seedVisits: ServiceVisit[] = [
       { description: "Front rotors, resurfaced", kind: "labor", quantity: 2, unitPrice: 45.0, total: 90.0, performedBy: "Marcus D", partNumber: null },
       { description: "Brake service labor", kind: "labor", quantity: 1.8, unitPrice: 129.0, total: 232.2, performedBy: "Marcus D", partNumber: null },
     ],
-    totals: { parts: 89.99, labor: 322.2, fees: 0, tax: 41.94, total: 454.13, paymentMethod: "Visa •••• 3911" },
+    totals: { parts: 89.99, labor: 322.2, fees: 0, tax: 41.94, total: 454.13, paymentMethod: "Visa •••• 4242" },
     diagnostics: {
       brakeLinings: [
         { position: "front-left", value: 10, unit: "32nds" },
@@ -253,7 +253,7 @@ export const seedVisits: ServiceVisit[] = [
       { description: "Installation, balancing, TPMS service", kind: "labor", quantity: 4, unitPrice: 22.0, total: 88.0, performedBy: null, partNumber: null },
       { description: "State tire fee", kind: "fee", quantity: 4, unitPrice: 1.0, total: 4.0, performedBy: null, partNumber: null },
     ],
-    totals: { parts: 568.0, labor: 88.0, fees: 4.0, tax: 67.32, total: 727.32, paymentMethod: "Visa •••• 3911" },
+    totals: { parts: 568.0, labor: 88.0, fees: 4.0, tax: 67.32, total: 727.32, paymentMethod: "Visa •••• 4242" },
     diagnostics: null,
     warranties: [
       {

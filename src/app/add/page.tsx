@@ -125,7 +125,7 @@ export default function AddVehiclePage() {
         </div>
 
         {error && (
-          <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -177,7 +177,7 @@ export default function AddVehiclePage() {
                   {recalls.map((r) => (
                     <li key={r.campaignNumber} className="rounded-lg border-2 border-amber-500/60 bg-amber-500/5 p-3.5">
                       <div className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-snug">{r.component}</p>
                           <p className="mt-1 text-xs leading-snug text-muted-foreground">{r.summary}</p>

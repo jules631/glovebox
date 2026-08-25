@@ -116,7 +116,7 @@ export default function GaragePage() {
 
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 {repeatCount > 0 && (
-                  <span className="flex items-center gap-1 font-medium text-amber-600">
+                  <span className="flex items-center gap-1 font-medium text-amber-700">
                     <AlertTriangle className="size-3.5" />
                     {repeatCount} possible repeat charge{repeatCount === 1 ? "" : "s"}
                   </span>
@@ -136,9 +136,15 @@ export default function GaragePage() {
         {rows !== null && <ServiceEmailCard />}
 
         {notice && (
-          <p className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">{notice}</p>
+          <p role="status" className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">
+            {notice}
+          </p>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

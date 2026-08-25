@@ -141,13 +141,41 @@ export interface SaveOptions {
   hasSourceDocument?: boolean;
 }
 
+/**
+ * The client-facing save. A cookie-authenticated visitor can photograph a
+ * receipt or log work by hand, but the trust tier is the server's to decide,
+ * never the client's: this path can only ever mint `photo` or `owner_entry`,
+ * and it holds no source document the server can vouch for. The shop-originated
+ * tiers exist only on the inbound-webhook path, which observes a real shop
+ * email. Clamping here means no current or future cookie route can forge trust,
+ * even if it passes `intakeMethod: "shop_email"` in the body.
+ */
 export async function saveReceipt(
   clientId: string,
   receipt: ExtractedReceipt,
   options: SaveOptions,
 ): Promise<{ vehicleId: string; visitId: string }> {
   const gid = await garageId(clientId);
-  return saveReceiptForGarage(gid, receipt, options);
+  const intakeMethod: IntakeMethod = options.intakeMethod === "owner_entry" ? "owner_entry" : "photo";
+  return saveReceiptForGarage(gid, receipt, {
+    vehicleId: options.vehicleId,
+    receiptThumbnail: options.receiptThumbnail,
+    intakeMethod,
+    hasSourceDocument: false,
+  });
+}
+
+/**
+ * Write a demo record. Trusted server path (the seed route only), tiered as
+ * `seed` so the trust model reports it as a fixture and never counts it as
+ * evidence, which is what the demo garage is supposed to be.
+ */
+export async function saveDemoReceipt(
+  clientId: string,
+  receipt: ExtractedReceipt,
+): Promise<{ vehicleId: string; visitId: string }> {
+  const gid = await garageId(clientId);
+  return saveReceiptForGarage(gid, receipt, { intakeMethod: "seed", hasSourceDocument: false });
 }
 
 /** The save path itself, shared by the cookie routes and the inbound webhook. */
@@ -166,19 +194,31 @@ export async function saveReceiptForGarage(
   let vehicleId = options.vehicleId;
   if (vehicleId) {
     const vehicle = vehicles.find((v) => v.id === vehicleId);
-    if (vehicle) {
-      // Fill gaps from the receipt without clobbering what the owner has set.
-      const mileageWins = receipt.visit.mileage != null && (vehicle.currentMileage ?? 0) < receipt.visit.mileage;
-      await sql`
-        update vehicles set
-          vin = coalesce(vin, ${receipt.vehicle.vin}),
-          license_plate = coalesce(license_plate, ${receipt.vehicle.licensePlate}),
-          year = coalesce(year, ${receipt.vehicle.year}),
-          current_mileage = ${mileageWins ? receipt.visit.mileage : vehicle.currentMileage},
-          mileage_as_of = ${mileageWins ? (receipt.visit.dateOut ?? receipt.visit.dateIn) : vehicle.mileageAsOf}
-        where id = ${vehicleId}
-      `;
+    if (!vehicle) {
+      // The client supplied a vehicleId that is not in this garage. Never insert
+      // a visit against a car another garage owns: an unknown id is a rejection,
+      // not a silent cross-tenant write.
+      throw new Error("vehicle not found in this garage");
     }
+    // Fill gaps from the receipt without clobbering what the owner has set.
+    // current_mileage is read and advanced inside SQL rather than echoed back
+    // from the value read at the top of this request, so a concurrent odometer
+    // update cannot be reverted, and the number only ever moves forward.
+    const newMileage = receipt.visit.mileage;
+    const newAsOf = receipt.visit.dateOut ?? receipt.visit.dateIn;
+    await sql`
+      update vehicles set
+        vin = coalesce(vin, ${receipt.vehicle.vin}),
+        license_plate = coalesce(license_plate, ${receipt.vehicle.licensePlate}),
+        year = coalesce(year, ${receipt.vehicle.year}),
+        current_mileage = case
+          when ${newMileage}::int is not null and ${newMileage}::int > coalesce(current_mileage, 0)
+          then ${newMileage}::int else current_mileage end,
+        mileage_as_of = case
+          when ${newMileage}::int is not null and ${newMileage}::int > coalesce(current_mileage, 0)
+          then ${newAsOf}::date else mileage_as_of end
+      where id = ${vehicleId}
+    `;
   } else {
     const matched = matchVehicle(vehicles, receipt.vehicle);
     if (matched) {
@@ -312,15 +352,27 @@ export async function garageIdByAliasToken(token: string): Promise<string | null
 // Inbound mail log: recorded before processing so a failed extraction is a
 // visible state, never lost mail.
 
+/**
+ * Record an inbound message before processing. Returns the new row id, or null
+ * when this MessageID has already been seen: Postmark delivers at least once, so
+ * a retry or replay must not become a second extraction and a second visit. The
+ * unique index on message_id makes the dedupe atomic under concurrent delivery.
+ */
 export async function recordInbound(
   gid: string,
   fromEmail: string | null,
   subject: string | null,
-): Promise<string> {
+  messageId: string | null,
+): Promise<string | null> {
   const sql = db();
   const id = `inb_${crypto.randomUUID()}`;
-  await sql`insert into inbound_messages (id, garage_id, from_email, subject) values (${id}, ${gid}, ${fromEmail}, ${subject})`;
-  return id;
+  const rows = (await sql`
+    insert into inbound_messages (id, garage_id, from_email, subject, message_id)
+    values (${id}, ${gid}, ${fromEmail}, ${subject}, ${messageId})
+    on conflict (message_id) where message_id is not null do nothing
+    returning id
+  `) as Row[];
+  return rows.length ? (rows[0].id as string) : null;
 }
 
 export async function resolveInbound(id: string, visitId: string): Promise<void> {
@@ -331,4 +383,40 @@ export async function resolveInbound(id: string, visitId: string): Promise<void>
 export async function failInbound(id: string, error: string): Promise<void> {
   const sql = db();
   await sql`update inbound_messages set status = 'failed', error = ${error.slice(0, 500)} where id = ${id}`;
+}
+
+export interface ExtractionCaps {
+  perClientDaily: number;
+  globalDaily: number;
+}
+
+/**
+ * Durable rate limit for the extraction endpoint, the one expensive action a
+ * mostly-unauthenticated client can trigger. Counts the last 24h per client and
+ * across all clients; if either cap is already met, refuses. Otherwise records
+ * one unit of usage and allows the call. Unlike an in-memory counter this
+ * survives serverless cold starts and aggregates across the whole fleet, so the
+ * daily spend has a real ceiling. The count-then-insert is not perfectly atomic,
+ * but the caps are budget guards, not security boundaries, and a few concurrent
+ * requests slipping past a soft limit is immaterial to cost.
+ */
+export async function reserveExtraction(
+  clientId: string,
+  caps: ExtractionCaps,
+): Promise<{ ok: true } | { ok: false; reason: "client" | "global" }> {
+  const sql = db();
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const clientRows = (await sql`
+    select count(*)::int as n from extraction_usage where client_id = ${clientId} and created_at >= ${since}
+  `) as Row[];
+  if ((clientRows[0]?.n as number) >= caps.perClientDaily) return { ok: false, reason: "client" };
+
+  const globalRows = (await sql`
+    select count(*)::int as n from extraction_usage where created_at >= ${since}
+  `) as Row[];
+  if ((globalRows[0]?.n as number) >= caps.globalDaily) return { ok: false, reason: "global" };
+
+  await sql`insert into extraction_usage (client_id) values (${clientId})`;
+  return { ok: true };
 }
