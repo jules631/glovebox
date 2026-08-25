@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronRight, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronRight, Plus, ShieldCheck } from "lucide-react";
 import { AppHeader } from "@/components/page-header";
 import { ServiceEmailCard } from "@/components/service-email-card";
 import { Welcome } from "@/components/welcome";
 import { Odometer } from "@/components/odometer";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { getGarage, invalidateGarage, loadDemoGarage } from "@/lib/store";
 import { migrateLocalRecords } from "@/lib/migrate-local";
 import { buildVehicleReport } from "@/lib/vehicle-report";
@@ -24,6 +26,7 @@ interface GarageRow {
 
 export default function GaragePage() {
   const [rows, setRows] = useState<GarageRow[] | null>(null);
+  const [demoOnly, setDemoOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -41,6 +44,12 @@ export default function GaragePage() {
       }
 
       const { vehicles, visits } = await getGarage();
+      // A garage holding nothing but seed records belongs to someone who tried
+      // the demo before adding a car. The pitch is over but the ask is not, so
+      // the real call to action stays on screen until a real record exists.
+      setDemoOnly(
+        vehicles.length > 0 && visits.length > 0 && visits.every((v) => v.provenance.method === "seed"),
+      );
       setRows(
         vehicles.map((vehicle) => {
           const report = buildVehicleReport(
@@ -82,6 +91,18 @@ export default function GaragePage() {
     <div>
       <AppHeader asHeading />
       <div className="space-y-3 px-5 pt-4">
+        {demoOnly && (
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="font-display text-sm font-semibold uppercase tracking-[0.14em]">This is the demo garage</p>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              Everything below is sample data so you can see what a kept history looks like. Your own
+              record starts with seventeen characters.
+            </p>
+            <Link href="/add" className={cn(buttonVariants({ size: "lg" }), "mt-3 w-full")}>
+              Add your car by VIN
+            </Link>
+          </div>
+        )}
         {rows === null ? (
           <>
             <Skeleton className="h-28 w-full rounded-lg" />
@@ -131,6 +152,18 @@ export default function GaragePage() {
               </div>
             </Link>
           ))
+        )}
+
+        {rows !== null && rows.length > 0 && (
+          /* The welcome screen carried the only route to /add, and it leaves the
+             moment a vehicle exists. Adding a second car has to stay one tap away. */
+          <Link
+            href="/add"
+            className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border p-4 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+          >
+            <Plus className="size-4" />
+            Add a vehicle by VIN
+          </Link>
         )}
 
         {rows !== null && <ServiceEmailCard />}
