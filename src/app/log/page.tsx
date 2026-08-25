@@ -251,6 +251,14 @@ export default function LogDiyPage() {
             />
           </div>
 
+          {/* Set the expectation honestly at the point of entry: this record is
+              the weakest tier in the product, and the record view will say the
+              same thing to a buyer. */}
+          <p className="rounded-lg border border-dashed border-border bg-card p-3 text-xs leading-snug text-muted-foreground">
+            Saved as owner entered, the weakest kind of record. A future buyer will see this work but cannot check it
+            against any outside source.
+          </p>
+
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
           <Button className="w-full" size="lg" onClick={save} disabled={saving || !vehicleId}>
