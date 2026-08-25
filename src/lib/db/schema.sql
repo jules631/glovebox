@@ -120,3 +120,24 @@ create table if not exists inbound_messages (
   received_at  timestamptz not null default now()
 );
 create index if not exists inbound_garage_idx on inbound_messages (garage_id);
+
+-- Postmark delivers at least once, so the same mail can arrive twice (a retry
+-- after a slow ack, or a deliberate replay by anyone holding the webhook URL).
+-- The provider's MessageID makes each delivery idempotent: a duplicate is
+-- recognized and dropped before it becomes a second extraction and a second
+-- visit.
+alter table inbound_messages add column if not exists message_id text;
+create unique index if not exists inbound_message_id_idx
+  on inbound_messages (message_id) where message_id is not null;
+
+-- Extraction is the one expensive, unauthenticated-by-default action: each call
+-- runs a vision model. This table is the durable rate-limit ledger, one row per
+-- accepted extraction, so a per-client and a global daily cap survive the
+-- serverless cold starts that reset any in-memory counter.
+create table if not exists extraction_usage (
+  id          bigserial primary key,
+  client_id   text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists extraction_usage_client_idx on extraction_usage (client_id, created_at);
+create index if not exists extraction_usage_time_idx on extraction_usage (created_at);

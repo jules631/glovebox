@@ -9,6 +9,7 @@ export interface PostmarkAttachment {
 }
 
 export interface PostmarkInbound {
+  MessageID?: string;
   FromFull?: { Email?: string; Name?: string };
   Subject?: string;
   MailboxHash?: string;
@@ -16,6 +17,35 @@ export interface PostmarkInbound {
   TextBody?: string;
   HtmlBody?: string;
   Attachments?: PostmarkAttachment[];
+}
+
+// A single attachment past this decoded size is dropped rather than forwarded
+// to the model. Inbound mail is unauthenticated in the sense that anyone who
+// knows the alias can send it, so an oversized or bomb attachment must not
+// become cost or a stalled extraction.
+const MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024;
+
+/** Decoded byte size of a base64 string, without allocating the bytes. */
+function base64Bytes(b64: string): number {
+  const len = b64.length;
+  if (!len) return 0;
+  const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+  return Math.floor((len * 3) / 4) - padding;
+}
+
+// Free consumer mailboxes. Mail from one of these is the owner forwarding a
+// receipt (or someone impersonating a shop), not a shop's own system, so it
+// cannot earn the shop-originated tier. A shop emails from its own domain.
+const CONSUMER_MAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "outlook.com",
+  "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "mac.com",
+  "aol.com", "proton.me", "protonmail.com", "gmx.com", "mail.com", "zoho.com",
+]);
+
+export function isConsumerSender(email: string | null): boolean {
+  if (!email) return true; // no verifiable sender is treated as untrusted
+  const domain = email.split("@")[1]?.toLowerCase().trim();
+  return !domain || CONSUMER_MAIL_DOMAINS.has(domain);
 }
 
 /**
@@ -107,7 +137,9 @@ export function normalizeInbound(mail: PostmarkInbound): NormalizedInbound {
       ? htmlToText(mail.HtmlBody)
       : "";
 
-  const attachments = mail.Attachments ?? [];
+  const attachments = (mail.Attachments ?? []).filter(
+    (a) => base64Bytes(a.Content) <= MAX_ATTACHMENT_BYTES,
+  );
   return {
     fromEmail: mail.FromFull?.Email ?? null,
     subject: mail.Subject ?? null,

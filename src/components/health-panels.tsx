@@ -37,7 +37,7 @@ export function RepeatAlerts({ repeats }: { repeats: RepeatFinding[] }) {
           {stated.map((r, i) => (
             <div key={i} className="rounded-lg border-2 border-amber-500/60 bg-amber-500/5 p-3.5">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium leading-snug">
                     {r.label} · {fmtUSD(r.amountAtRisk)} at risk
@@ -94,7 +94,7 @@ export function DueList({ items }: { items: DueItem[] }) {
             <span
               className={
                 item.state === "overdue"
-                  ? "shrink-0 font-mono text-xs font-semibold tabular-nums text-amber-600"
+                  ? "shrink-0 font-mono text-xs font-semibold tabular-nums text-amber-700"
                   : "shrink-0 font-mono text-xs tabular-nums text-muted-foreground"
               }
             >
@@ -187,7 +187,7 @@ export function MileagePanel({ analysis }: { analysis: MileageAnalysis }) {
           <ul className="mt-3 space-y-1.5 border-t border-dashed border-border pt-2.5">
             {flagged.map((a, i) => (
               <li key={i} className="flex items-start gap-2 text-xs leading-snug">
-                <Gauge className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                <Gauge className="mt-0.5 size-3.5 shrink-0 text-amber-700" />
                 <span>{a.message}</span>
               </li>
             ))}

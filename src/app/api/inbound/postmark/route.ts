@@ -4,6 +4,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedReceiptSchema } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/extraction-prompt";
 import {
+  isConsumerSender,
   normalizeInbound,
   resolveAliasToken,
   type PostmarkInbound,
@@ -59,7 +60,20 @@ export async function POST(request: Request) {
     return Response.json({ ignored: "empty message" });
   }
 
-  const inboundId = await recordInbound(gid, normalized.fromEmail, normalized.subject);
+  const inboundId = await recordInbound(gid, normalized.fromEmail, normalized.subject, mail.MessageID ?? null);
+  if (!inboundId) {
+    // Already processed this MessageID. Postmark retries on non-2xx, so a
+    // duplicate delivery must return 200 and do nothing rather than extract and
+    // save the same invoice twice.
+    return Response.json({ ignored: "duplicate message" });
+  }
+
+  // A shop's own system emails from the shop's domain; that is what earns the
+  // shop-originated tier. Mail from a free consumer mailbox is the owner
+  // forwarding a receipt (or someone impersonating a shop from a throwaway
+  // address), so it is recorded as owner-asserted, not shop-originated. The
+  // attached document is still there for a buyer to check either way.
+  const shopOriginated = !isConsumerSender(normalized.fromEmail);
 
   // Acknowledge now; extract after the response is on the wire.
   after(async () => {
@@ -98,9 +112,10 @@ export async function POST(request: Request) {
       }
 
       const { visitId } = await saveReceiptForGarage(gid, response.parsed_output, {
-        // Mail sent by the shop's own system is the strongest tier the product
-        // accepts, and the whole point of the address.
-        intakeMethod: normalized.pdfAttachments.length ? "pdf" : "shop_email",
+        // Mail from the shop's own system is the strongest tier the product
+        // accepts, and the whole point of the address. A forward from a consumer
+        // mailbox is honest owner-asserted history, not shop-originated.
+        intakeMethod: shopOriginated ? (normalized.pdfAttachments.length ? "pdf" : "shop_email") : "owner_entry",
         hasSourceDocument: normalized.pdfAttachments.length + normalized.imageAttachments.length > 0,
       });
       await resolveInbound(inboundId, visitId);

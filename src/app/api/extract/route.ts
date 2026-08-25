@@ -2,6 +2,18 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedReceiptSchema } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/extraction-prompt";
+import { getClientId } from "@/lib/db/client-id";
+import { reserveExtraction } from "@/lib/db/garage";
+
+// Per-visitor, and it spends money. Never a cacheable render.
+export const dynamic = "force-dynamic";
+
+// Daily caps on the one action that runs a vision model. Overridable by env so
+// the ceiling can be tuned without a deploy, but the defaults are deliberately
+// low: this is a demo, not a service, and the point is that no visitor can run
+// up an unbounded bill.
+const PER_CLIENT_DAILY = Number(process.env.EXTRACT_DAILY_PER_CLIENT ?? 15);
+const GLOBAL_DAILY = Number(process.env.EXTRACT_DAILY_GLOBAL ?? 50);
 
 // A timeout ceiling, not a budget: an unused second costs nothing. Vision on a
 // multi page invoice runs 20 to 40 seconds before any thinking, so the old 60s
@@ -14,21 +26,6 @@ const MAX_TEXT_CHARS = 60_000;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 
-// Cheap abuse guard for an unauthenticated route. In-memory is fine for a
-// demo: worst case a new serverless instance resets the count.
-const RATE_LIMIT = 10;
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-const hits = new Map<string, number[]>();
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
-  if (recent.length >= RATE_LIMIT) return true;
-  recent.push(now);
-  hits.set(ip, recent);
-  return false;
-}
-
 type ImageType = (typeof IMAGE_TYPES)[number];
 
 function isImageType(type: string): type is ImageType {
@@ -36,12 +33,21 @@ function isImageType(type: string): type is ImageType {
 }
 
 export async function POST(request: Request) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (rateLimited(ip)) {
-    return Response.json(
-      { error: "Too many scans in the last hour. Try again a bit later." },
-      { status: 429 },
-    );
+  // Tie every extraction to a garage cookie (issued here if absent) and hold it
+  // to a durable daily cap, per client and across all clients. This is what
+  // keeps a public endpoint that runs a vision model from becoming an open door
+  // to someone else's API bill.
+  const clientId = await getClientId();
+  const reservation = await reserveExtraction(clientId, {
+    perClientDaily: PER_CLIENT_DAILY,
+    globalDaily: GLOBAL_DAILY,
+  });
+  if (!reservation.ok) {
+    const message =
+      reservation.reason === "client"
+        ? "You have reached today's scan limit. Try again tomorrow."
+        : "The demo has reached today's total scan capacity. Try again tomorrow.";
+    return Response.json({ error: message }, { status: 429 });
   }
 
   // Two intake paths through one extractor. Pasted text matters more than it

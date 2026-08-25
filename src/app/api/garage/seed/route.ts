@@ -1,5 +1,5 @@
 import { getClientId } from "@/lib/db/client-id";
-import { loadGarage, saveReceipt } from "@/lib/db/garage";
+import { loadGarage, saveDemoReceipt } from "@/lib/db/garage";
 import { seedReceipts } from "@/lib/seed";
 
 // Per-visitor data, and writes. Never a cacheable render.
@@ -21,7 +21,7 @@ export async function POST() {
     }
 
     for (const receipt of seedReceipts()) {
-      await saveReceipt(clientId, receipt, { intakeMethod: "photo", hasSourceDocument: false });
+      await saveDemoReceipt(clientId, receipt);
     }
 
     return Response.json(await loadGarage(clientId));

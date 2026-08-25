@@ -36,7 +36,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // No maximumScale: pinch-zoom must stay available. This app is full of small
+  // print (warranty terms, campaign numbers), and low-vision users on Android
+  // cannot magnify it if zoom is capped.
   themeColor: "#2547a8",
 };
 
