@@ -1,6 +1,6 @@
 # Glovebox
 
-Every shop. One service history. Owned by the driver, checkable by the next one.
+CARFAX built service history for the next buyer. Glovebox builds it for the person paying the bills: what was done, what is still covered, and what you should never pay for twice.
 
 <p align="center">
   <img src="validation/glovebox_promo.gif" alt="A 75 second tour: why scattered service history costs people money, and what Glovebox does about it" width="560">
@@ -8,11 +8,11 @@ Every shop. One service history. Owned by the driver, checkable by the next one.
 
 ## The problem
 
-Every repair shop keeps its own records for its own location. The Pep Boys in Ballard knows nothing about the Pep Boys in Queen Anne, let alone the Goodyear down the street or the dealer. Owners are left with emails and paper, which fail at exactly the moments they matter: selling the car, proving a warranty claim, or knowing which technician did what work.
+Vehicle history is a solved problem for exactly one person: the buyer, at the moment of sale. CARFAX spent decades wiring shop management systems into a report it sells at the transaction. That question is answered, and this product does not pretend otherwise.
 
-CARFAX cannot close this. By their own documentation, records an owner adds are excluded from the Vehicle History Report, and the shop reporting feed carries no prices at all. Work at an independent shop, and work you did yourself, is structurally invisible to it.
+The owner is the one nobody serves. For the years you actually pay for the car's upkeep, the record works for someone else: every shop keeps its own file for its own location, the shop feed CARFAX receives carries no prices, no line items, and no warranty terms, records an owner adds are excluded from the report by their own documentation, and work at an independent shop or in your own driveway reaches no reporting system at all.
 
-The cost is concrete. Pay for brake work, lose the receipt, and six months later pay again for something that was still covered.
+The cost is concrete. Pay for brake work, lose the receipt, and six months later pay again for something that was still covered. No product in the market tracks what you already paid for.
 
 ## What it does
 
@@ -32,7 +32,7 @@ Photograph a receipt, upload a PDF, paste an emailed invoice, or log your own wo
 
 ## Why the next owner should believe any of it
 
-They should not, if the seller controls the record. The person with the most incentive to shade a history is the person holding the phone. So the product does not ask for trust; it makes the record expensive to fake and cheap to check.
+They should not, if the seller controls the record. The person with the most incentive to shade a history is the person holding the phone. So the product does not ask for trust; it makes the record expensive to fake and cheap to check. It travels beside a CARFAX report, not instead of one: the receipts behind, and beyond, the report's summary lines.
 
 - **Provenance over assertion.** Every record carries how it arrived, and the summary reports the mix rather than a score: shop originated, photographed and payment matched, photographed, owner entered.
 - **Verifiability.** Each record shows what a skeptic could do to check it, usually calling the shop and reading back an invoice number.

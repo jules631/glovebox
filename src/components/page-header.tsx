@@ -12,7 +12,7 @@ export function AppHeader({ asHeading = false }: { asHeading?: boolean }) {
         Glovebox
       </Wordmark>
       <p className="text-sm text-muted-foreground">
-        Every shop. One service history.
+        Know what&rsquo;s covered. Never pay twice.
       </p>
     </header>
   );

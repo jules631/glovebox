@@ -13,7 +13,7 @@ const audiences = [
   {
     icon: Tag,
     role: "Sell it",
-    line: "A history kept for years is proof no listing photo can match.",
+    line: "Hand over the receipts behind the report. Proof no listing photo can match.",
   },
   {
     icon: SearchCheck,
@@ -51,11 +51,12 @@ export function Welcome({ onLoadDemo, loadingDemo }: { onLoadDemo: () => void; l
     <div className="space-y-5">
       <div>
         <h2 className="font-display text-3xl font-bold leading-tight">
-          Proof your car was cared for.
+          Never pay twice for the same repair.
         </h2>
         <p className="mt-2 text-sm leading-snug text-muted-foreground">
-          Every shop keeps its own records. Glovebox gathers them into one service history that stays
-          with the car, shows what is still covered, and gives the next buyer a way to check every claim.
+          Shops keep records for themselves, and CARFAX sells them to your car&rsquo;s next buyer.
+          Glovebox is the history that works for you while you own the car: what was done, what is
+          still covered, and a record the next owner can check when you sell.
         </p>
       </div>
 

@@ -25,7 +25,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Glovebox",
   description:
-    "One service history for your car, across every shop. Scan a receipt, keep the record, know what's still covered.",
+    "The service history that works for the owner: what was done, what is still covered, and what you should never pay for twice.",
   appleWebApp: {
     capable: true,
     title: "Glovebox",
